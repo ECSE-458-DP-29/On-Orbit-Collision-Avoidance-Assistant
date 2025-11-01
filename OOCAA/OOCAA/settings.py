@@ -37,7 +37,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'core',  # Fixed capitalization
+    'rest_framework',
+    'rest_framework.authtoken',
+    'django_filters',
+    'corsheaders',
+    'core',
 ]
 
 # Custom user model
@@ -46,6 +50,7 @@ AUTH_USER_MODEL = 'core.User'
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -76,16 +81,28 @@ WSGI_APPLICATION = 'OOCAA.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# MongoDB Atlas Configuration using Djongo
+# SQLite Configuration (for development - recommended)
 DATABASES = {
     'default': {
-        'ENGINE': 'djongo',
-        'NAME': 'oocaa_database',
-        'CLIENT': {
-            'host': 'mongodb+srv://admin:X5Z8NTEK2SCkDoqu@cluster42519.jgo1jtk.mongodb.net/oocaa_database?retryWrites=true&w=majority',
-        }
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# MongoDB Atlas Configuration using Djongo5
+# Note: djongo5 still has issues with complex queries (JOINs, ORDER BY) in Django 5.2.7
+# For MongoDB integration, consider using PyMongo directly alongside Django ORM
+# See MONGODB_NOTES.md for implementation details
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'djongo',
+#         'NAME': 'oocaa_database',
+#         'ENFORCE_SCHEMA': False,
+#         'CLIENT': {
+#             'host': 'mongodb+srv://admin:X5Z8NTEK2SCkDoqu@cluster42519.jgo1jtk.mongodb.net/oocaa_database?retryWrites=true&w=majority',
+#         }
+#     }
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -127,3 +144,29 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+}
+
+# CORS Configuration (for development - adjust for production)
+CORS_ALLOW_ALL_ORIGINS = True  # Change this in production
+CORS_ALLOW_CREDENTIALS = True
