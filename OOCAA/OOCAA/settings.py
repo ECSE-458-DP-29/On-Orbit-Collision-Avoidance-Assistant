@@ -76,16 +76,24 @@ WSGI_APPLICATION = 'OOCAA.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# MongoDB Atlas Configuration using Djongo
+# SQLite Configuration (for development)
 DATABASES = {
     'default': {
-        'ENGINE': 'djongo',
-        'NAME': 'oocaa_database',
-        'CLIENT': {
-            'host': 'mongodb+srv://admin:X5Z8NTEK2SCkDoqu@cluster42519.jgo1jtk.mongodb.net/oocaa_database?retryWrites=true&w=majority',
-        }
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# MongoDB Atlas Configuration using Djongo (uncomment when ready to use MongoDB)
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'djongo',
+#         'NAME': 'oocaa_database',
+#         'CLIENT': {
+#             'host': 'mongodb+srv://admin:X5Z8NTEK2SCkDoqu@cluster42519.jgo1jtk.mongodb.net/oocaa_database?retryWrites=true&w=majority',
+#         }
+#     }
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
