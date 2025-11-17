@@ -24,6 +24,28 @@ class SpaceObjectSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 
+class SpaceObjectNestedSerializer(serializers.ModelSerializer):
+    """Serializer for nested SpaceObject creation within CDM.
+    
+    Skips uniqueness validation on object_designator since the service
+    layer handles get_or_create logic.
+    """
+
+    class Meta:
+        model = SpaceObject
+        fields = [
+            'object_designator',
+            'object_name',
+            'object_type',
+            'operator_organization',
+            'maneuverable',
+        ]
+        extra_kwargs = {
+            # Remove the unique validator - service layer handles duplicates
+            'object_designator': {'validators': []},
+        }
+
+
 class CDMSerializer(serializers.ModelSerializer):
     """Serializer for creating/updating CDM instances.
 
@@ -39,6 +61,7 @@ class CDMSerializer(serializers.ModelSerializer):
             'obj1',
             'obj2',
             'tca',
+            'event',
             'miss_distance_m',
             'relative_position_r',
             'relative_position_t',
@@ -48,7 +71,7 @@ class CDMSerializer(serializers.ModelSerializer):
             'obj1_data',
             'obj2_data',
         ]
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'event']
 
     # Use PrimaryKeyRelatedField so DRF validates that provided PKs exist
     obj1 = serializers.PrimaryKeyRelatedField(
@@ -57,10 +80,9 @@ class CDMSerializer(serializers.ModelSerializer):
     obj2 = serializers.PrimaryKeyRelatedField(
         queryset=SpaceObject.objects.all(), allow_null=True, required=False
     )
-    # Allow nested object creation via obj1_data/obj2_data when the caller
-    # wants the API to create a SpaceObject as part of the CDM POST.
-    obj1_data = SpaceObjectSerializer(write_only=True, required=False)
-    obj2_data = SpaceObjectSerializer(write_only=True, required=False)
+    # Use the nested serializer that skips uniqueness validation
+    obj1_data = SpaceObjectNestedSerializer(write_only=True, required=False)
+    obj2_data = SpaceObjectNestedSerializer(write_only=True, required=False)
 
     def validate_collision_probability(self, value):
         # Model validators already enforce 0..1 but validate here for clearer API errors
@@ -75,23 +97,6 @@ class CDMSerializer(serializers.ModelSerializer):
         # Nothing required here otherwise; caller may provide obj1/obj2 as PKs or
         # obj1_data/obj2_data to create them on the fly.
         return attrs
-
-
-__all__ = ['CDMSerializer']
-class SpaceObjectSerializer(serializers.ModelSerializer):
-    """Serializer for SpaceObject create/list operations."""
-
-    class Meta:
-        model = SpaceObject
-        fields = [
-            'id',
-            'object_designator',
-            'object_name',
-            'object_type',
-            'operator_organization',
-            'maneuverable',
-        ]
-        read_only_fields = ['id']
 
 
 __all__ = ['CDMSerializer', 'SpaceObjectSerializer']

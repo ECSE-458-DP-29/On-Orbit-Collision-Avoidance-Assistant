@@ -38,5 +38,13 @@ class CDM(models.Model):
         max_length=32, default="OTHER"
     )
 
+    event = models.ForeignKey(
+        'Event',
+        related_name='cdms',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+
     def __str__(self):
         return f"CDM #{self.id} @ {self.tca.isoformat()}"
