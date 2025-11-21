@@ -6,6 +6,7 @@ from rest_framework import serializers
 
 from core.models.cdm import CDM
 from core.models.spaceobject import SpaceObject
+from core.models.event import Event
 
 
 class SpaceObjectSerializer(serializers.ModelSerializer):
@@ -98,5 +99,51 @@ class CDMSerializer(serializers.ModelSerializer):
         # obj1_data/obj2_data to create them on the fly.
         return attrs
 
+class CDMMinimalSerializer(serializers.ModelSerializer):
+    """Minimal CDM serializer for nested representation in Event."""
+    
+    class Meta:
+        model = CDM
+        fields = [
+            'id',
+            'tca',
+            'miss_distance_m',
+            'collision_probability',
+            'collision_probability_method',
+        ]
 
-__all__ = ['CDMSerializer', 'SpaceObjectSerializer']
+
+class EventSerializer(serializers.ModelSerializer):
+    """Serializer for Event instances with nested CDMs and SpaceObjects."""
+    
+    # Nested representations for better readability
+    obj1_details = SpaceObjectSerializer(source='obj1', read_only=True)
+    obj2_details = SpaceObjectSerializer(source='obj2', read_only=True)
+    cdms = CDMMinimalSerializer(many=True, read_only=True)
+    cdm_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Event
+        fields = [
+            'id',
+            'obj1',
+            'obj2',
+            'obj1_details',
+            'obj2_details',
+            'representative_tca',
+            'cdm_count',
+            'cdms',
+        ]
+        read_only_fields = ['id']
+    
+    def get_cdm_count(self, obj):
+        """Return the number of CDMs associated with this event."""
+        return obj.cdms.count()
+
+
+__all__ = [
+    'CDMSerializer',
+    'SpaceObjectSerializer',
+    'EventSerializer',
+    'CDMMinimalSerializer',
+]

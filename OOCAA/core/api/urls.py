@@ -1,17 +1,27 @@
 """API urls for the core app.
 
-This file currently provides a simple landing view at the package root
-(`/api/`). Add DRF routers or additional URL patterns here when you
-enable DRF and implement viewsets.
+Provides RESTful endpoints for CDM and SpaceObject management.
 """
 
 from django.urls import path
-from .views import api_index
-from .views import CDMCreateView, SpaceObjectListCreateView
+from .views import (
+    api_index,
+    CDMListCreateView,
+    CDMDetailView,
+    SpaceObjectListCreateView,
+    EventListView
+)
 
 urlpatterns = [
-    path('', api_index, name='api-index'), #THIS IS AN EXAPLE VIEW
-    path('cdms/', CDMCreateView.as_view(), name='cdm-create'),
-    path('spaceobjects/', SpaceObjectListCreateView.as_view(), name='spaceobject-list'),
-    # future endpoints: path('spaceobjects/', include(...)) or DRF router
+    # Landing page
+    path('', api_index, name='api-index'),
+    
+    # CDM endpoints
+    path('cdms/', CDMListCreateView.as_view(), name='cdm-list-create'),
+    path('cdms/<int:pk>/', CDMDetailView.as_view(), name='cdm-detail'),
+    
+    # SpaceObject endpoints
+    path('spaceobjects/', SpaceObjectListCreateView.as_view(), name='spaceobject-list-create'),
+    # Event endpoints
+    path('events/', EventListView.as_view(), name='event-list'),
 ]
