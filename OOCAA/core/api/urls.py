@@ -9,7 +9,8 @@ from .views import (
     CDMListCreateView,
     CDMDetailView,
     SpaceObjectListCreateView,
-    EventListView
+    EventListView,
+    ParseCDMJsonView,
 )
 
 urlpatterns = [
@@ -19,6 +20,7 @@ urlpatterns = [
     # CDM endpoints
     path('cdms/', CDMListCreateView.as_view(), name='cdm-list-create'),
     path('cdms/<int:pk>/', CDMDetailView.as_view(), name='cdm-detail'),
+    path('cdms/parse/', ParseCDMJsonView.as_view(), name='cdm-parse'),
     
     # SpaceObject endpoints
     path('spaceobjects/', SpaceObjectListCreateView.as_view(), name='spaceobject-list-create'),

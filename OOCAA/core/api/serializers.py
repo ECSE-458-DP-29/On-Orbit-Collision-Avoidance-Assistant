@@ -21,7 +21,7 @@ class SpaceObjectSerializer(serializers.ModelSerializer):
             'object_type',
             'operator_organization',
             'maneuverable',
-        ]
+        ]  # removed state_vector, physical_parameters
         read_only_fields = ['id']
 
 
