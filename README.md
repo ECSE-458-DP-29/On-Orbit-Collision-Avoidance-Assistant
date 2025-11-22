@@ -17,8 +17,23 @@ python -m venv venv
 ```
 
 ### 3. Activate the Virtual Environment
+If you encounter an error about scripts being disabled, follow these steps:
+
+#### a. Check the Current Execution Policy
+Run the following command in PowerShell:
+```powershell
+Get-ExecutionPolicy
+```
+
+#### b. Temporarily Allow Script Execution
+If the policy is set to `Restricted`, temporarily allow script execution:
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+#### c. Activate the Virtual Environment
 - **Windows**:
-  ```bash
+  ```powershell
   venv\Scripts\activate
   ```
 - **macOS/Linux**:
@@ -27,13 +42,23 @@ python -m venv venv
   ```
 
 ### 4. Install Dependencies
-Install the required Python packages:
+Install the required Python packages using the `requirements.txt` file located in the `OOCAA` directory:
 ```bash
-pip install -r requirements.txt
+pip install -r OOCAA/requirements.txt
 ```
 
 ### 5. Apply Migrations
-Set up the database by applying migrations:
+The `manage.py` file is located in the `OOCAA` directory. Navigate to this directory:
+```bash
+cd OOCAA
+```
+
+If migrations have not been created yet, generate them:
+```bash
+python manage.py makemigrations
+```
+
+Then apply the migrations:
 ```bash
 python manage.py migrate
 ```
@@ -44,19 +69,9 @@ Start the Django development server:
 python manage.py runserver
 ```
 
-### 7. Deactivate the Virtual Environment (Optional)
-When you're done working, deactivate the virtual environment:
-```bash
-deactivate
-```
-
 ## Additional Notes
 - Ensure you have Python 3.8+ installed on your system.
 - If `pip` is outdated, upgrade it using:
   ```bash
   python -m pip install --upgrade pip
   ```
-
-## Project Overview
-- This project is a Django-based application for managing Conjunction Data Messages (CDMs) and related space object data.
-- For more details, refer to the documentation in the `docs/` folder.
