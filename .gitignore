@@ -1,3 +1,5 @@
 venv/
-OOCAA/OOCAA/__pycache__/
 .vscode
+__pycache__/
+OOCAA/core/migrations/
+db.sqlite3
