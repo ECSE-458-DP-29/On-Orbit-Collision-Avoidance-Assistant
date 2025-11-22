@@ -63,11 +63,24 @@ Then apply the migrations:
 python manage.py migrate
 ```
 
-### 6. Run the Development Server
+### 6. Create a Superuser
+To access the Django admin interface, create a superuser account. Run the following command:
+```bash
+python manage.py createsuperuser
+```
+You will be prompted to enter the following details:
+- **Username**: Choose a username for the admin account (preferably `admin`)
+- **Email**: You can press Enter to skip this field.
+- **Password**: Enter a password with at least 8 characters.
+
+### 7. Run the Development Server
 Start the Django development server:
 ```bash
 python manage.py runserver
 ```
+Once the superuser is created and the development server is running, you can log in to the admin interface at:
+[http://localhost:8000/admin](http://localhost:8000/admin)
+
 
 ## Additional Notes
 - Ensure you have Python 3.8+ installed on your system.
