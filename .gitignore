@@ -6,3 +6,6 @@ OOCAA/OOCAA/__pycache__/
 .vscode
 __pycache__/
 *.pyc
+
+# Environment variables (keep local configs private)
+.env

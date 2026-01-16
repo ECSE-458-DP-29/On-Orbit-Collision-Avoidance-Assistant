@@ -15,7 +15,17 @@ from core.services import (
     list_events,
 
 )
+from core.services.pc_calculation_service import (
+    calculate_pc_multistep,
+    calculate_pc_circle,
+    calculate_pc_dilution,
+    batch_calculate_pc,
+    update_cdm_with_pc_result,
+    PcCalculationError,
+    MatlabEngineError,
+)
 from core.models.spaceobject import SpaceObject
+from core.models.cdm import CDM
 from core.services.cdm_service import parse_cdm_json
 
 
@@ -184,6 +194,194 @@ class EventListView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class CalculatePcView(APIView):
+    """Calculate probability of collision for a specific CDM.
+    
+    POST: Trigger Pc calculation for a CDM using CARA MATLAB tools
+    
+    Request Body (optional):
+    {
+        "method": "multistep" | "circle" | "dilution",  // default: "multistep"
+        "update_cdm": true | false,  // default: true
+        "params": {}  // optional MATLAB parameters
+    }
+    
+    Response:
+    {
+        "cdm_id": 123,
+        "Pc": 1.23e-5,
+        "method": "PcMultiStep",
+        "details": {...},
+        "success": true,
+        "updated": true
+    }
+    """
+    
+    def post(self, request, pk, *args, **kwargs):
+        """Calculate Pc for the specified CDM."""
+        # Get the CDM
+        try:
+            cdm = CDM.objects.get(pk=pk)
+        except CDM.DoesNotExist:
+            return Response(
+                {"detail": "CDM not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Extract parameters from request
+        method = request.data.get('method', 'multistep').lower()
+        update_cdm_flag = request.data.get('update_cdm', True)
+        matlab_params = request.data.get('params', None)
+        
+        # Validate method
+        if method not in ['multistep', 'circle', 'dilution']:
+            return Response(
+                {"detail": f"Invalid method: {method}. Must be 'multistep', 'circle', or 'dilution'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Calculate Pc
+        try:
+            if method == 'multistep':
+                result = calculate_pc_multistep(cdm, matlab_params)
+            elif method == 'circle':
+                result = calculate_pc_circle(cdm)
+            elif method == 'dilution':
+                result = calculate_pc_dilution(cdm, matlab_params)
+            
+            # Update CDM if requested
+            if update_cdm_flag and result.get('success'):
+                update_cdm_with_pc_result(cdm, result, save=True)
+                result['updated'] = True
+            else:
+                result['updated'] = False
+            
+            result['cdm_id'] = cdm.id
+            
+            return Response(result, status=status.HTTP_200_OK)
+            
+        except PcCalculationError as e:
+            return Response(
+                {
+                    "detail": str(e),
+                    "error_type": "PcCalculationError",
+                    "success": False,
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except MatlabEngineError as e:
+            return Response(
+                {
+                    "detail": str(e),
+                    "error_type": "MatlabEngineError",
+                    "success": False,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "detail": f"Unexpected error: {str(e)}",
+                    "error_type": type(e).__name__,
+                    "success": False,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class BatchCalculatePcView(APIView):
+    """Calculate Pc for multiple CDMs in batch.
+    
+    POST: Calculate Pc for a list of CDM IDs
+    
+    Request Body:
+    {
+        "cdm_ids": [1, 2, 3, 4, 5],
+        "method": "multistep" | "circle" | "dilution",  // default: "multistep"
+        "update_cdms": true | false  // default: true
+    }
+    
+    Response:
+    {
+        "total": 5,
+        "successful": 4,
+        "failed": 1,
+        "results": [
+            {"cdm_id": 1, "Pc": 1.23e-5, "success": true, ...},
+            {"cdm_id": 2, "Pc": 4.56e-6, "success": true, ...},
+            ...
+        ]
+    }
+    """
+    
+    def post(self, request, *args, **kwargs):
+        """Calculate Pc for multiple CDMs."""
+        # Extract parameters
+        cdm_ids = request.data.get('cdm_ids', [])
+        method = request.data.get('method', 'multistep').lower()
+        update_cdms_flag = request.data.get('update_cdms', True)
+        
+        if not isinstance(cdm_ids, list) or not cdm_ids:
+            return Response(
+                {"detail": "cdm_ids must be a non-empty list of CDM IDs."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if method not in ['multistep', 'circle', 'dilution']:
+            return Response(
+                {"detail": f"Invalid method: {method}. Must be 'multistep', 'circle', or 'dilution'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Fetch CDMs
+        cdms = CDM.objects.filter(id__in=cdm_ids)
+        
+        if not cdms.exists():
+            return Response(
+                {"detail": "No CDMs found with the provided IDs."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Calculate Pc for all CDMs
+        try:
+            results = batch_calculate_pc(list(cdms), method=method)
+            
+            # Update CDMs if requested
+            if update_cdms_flag:
+                for result in results:
+                    if result.get('success'):
+                        try:
+                            cdm = CDM.objects.get(id=result['cdm_id'])
+                            update_cdm_with_pc_result(cdm, result, save=True)
+                            result['updated'] = True
+                        except CDM.DoesNotExist:
+                            result['updated'] = False
+                    else:
+                        result['updated'] = False
+            
+            # Count successes and failures
+            successful = sum(1 for r in results if r.get('success'))
+            failed = len(results) - successful
+            
+            return Response(
+                {
+                    "total": len(results),
+                    "successful": successful,
+                    "failed": failed,
+                    "results": results,
+                },
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            return Response(
+                {
+                    "detail": f"Batch calculation failed: {str(e)}",
+                    "error_type": type(e).__name__,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class ParseCDMJsonView(APIView):
     """API endpoint to parse a CDM JSON and create a CDM object."""
 
@@ -206,5 +404,7 @@ __all__ = [
     "CDMDetailView",
     "SpaceObjectListCreateView",
     "EventListView",
+    "CalculatePcView",
+    "BatchCalculatePcView",
     "ParseCDMJsonView",
 ]

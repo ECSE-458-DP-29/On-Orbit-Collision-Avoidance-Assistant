@@ -10,6 +10,8 @@ from .views import (
     CDMDetailView,
     SpaceObjectListCreateView,
     EventListView,
+    CalculatePcView,
+    BatchCalculatePcView,
     ParseCDMJsonView,
 )
 
@@ -21,6 +23,10 @@ urlpatterns = [
     path('cdms/', CDMListCreateView.as_view(), name='cdm-list-create'),
     path('cdms/<int:pk>/', CDMDetailView.as_view(), name='cdm-detail'),
     path('cdms/parse/', ParseCDMJsonView.as_view(), name='cdm-parse'),
+    
+    # Pc calculation endpoints
+    path('cdms/<int:pk>/calculate-pc/', CalculatePcView.as_view(), name='cdm-calculate-pc'),
+    path('cdms/batch-calculate-pc/', BatchCalculatePcView.as_view(), name='cdm-batch-calculate-pc'),
     
     # SpaceObject endpoints
     path('spaceobjects/', SpaceObjectListCreateView.as_view(), name='spaceobject-list-create'),

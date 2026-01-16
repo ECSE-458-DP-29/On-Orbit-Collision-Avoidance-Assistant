@@ -71,6 +71,24 @@ class CDMSerializer(serializers.ModelSerializer):
             'collision_probability_method',
             'obj1_data',
             'obj2_data',
+            # State vectors (ECI frame)
+            'obj1_position_x',
+            'obj1_position_y',
+            'obj1_position_z',
+            'obj1_velocity_x',
+            'obj1_velocity_y',
+            'obj1_velocity_z',
+            'obj2_position_x',
+            'obj2_position_y',
+            'obj2_position_z',
+            'obj2_velocity_x',
+            'obj2_velocity_y',
+            'obj2_velocity_z',
+            # Covariance matrices
+            'obj1_covariance_matrix',
+            'obj2_covariance_matrix',
+            # Hard body radius
+            'hard_body_radius',
         ]
         read_only_fields = ['id', 'event']
 
@@ -97,6 +115,49 @@ class CDMSerializer(serializers.ModelSerializer):
         # If nested creation data provided alongside a PK, prefer the explicit PK.
         # Nothing required here otherwise; caller may provide obj1/obj2 as PKs or
         # obj1_data/obj2_data to create them on the fly.
+        
+        # Validate covariance matrices if provided
+        for obj_num in [1, 2]:
+            cov_key = f'obj{obj_num}_covariance_matrix'
+            if cov_key in attrs and attrs[cov_key] is not None:
+                cov_matrix = attrs[cov_key]
+                
+                if not isinstance(cov_matrix, list):
+                    raise serializers.ValidationError({
+                        cov_key: 'Covariance matrix must be a nested array (list of lists)'
+                    })
+                
+                # Check dimensions (must be 3x3 or 6x6)
+                n_rows = len(cov_matrix)
+                if n_rows not in [3, 6]:
+                    raise serializers.ValidationError({
+                        cov_key: f'Covariance matrix must be 3x3 or 6x6, got {n_rows} rows'
+                    })
+                
+                # Validate each row
+                for i, row in enumerate(cov_matrix):
+                    if not isinstance(row, list):
+                        raise serializers.ValidationError({
+                            cov_key: f'Row {i} is not a list'
+                        })
+                    if len(row) != n_rows:
+                        raise serializers.ValidationError({
+                            cov_key: f'Row {i} has {len(row)} elements, expected {n_rows}'
+                        })
+                    # Validate that all elements are numeric
+                    for j, val in enumerate(row):
+                        if not isinstance(val, (int, float)):
+                            raise serializers.ValidationError({
+                                cov_key: f'Element [{i}][{j}] is not numeric'
+                            })
+        
+        # Validate hard body radius if provided
+        if 'hard_body_radius' in attrs and attrs['hard_body_radius'] is not None:
+            if attrs['hard_body_radius'] <= 0:
+                raise serializers.ValidationError({
+                    'hard_body_radius': 'Hard body radius must be greater than 0'
+                })
+        
         return attrs
 
 class CDMMinimalSerializer(serializers.ModelSerializer):
