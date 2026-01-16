@@ -19,7 +19,7 @@ def load_env_file():
     env_file = Path(__file__).parent / '.env'
     
     if not env_file.exists():
-        print("⚠️  Warning: .env file not found!")
+        print("  Warning: .env file not found!")
         print(f"   Expected location: {env_file}")
         print("   Copy .env.example to .env and configure your paths.")
         return False

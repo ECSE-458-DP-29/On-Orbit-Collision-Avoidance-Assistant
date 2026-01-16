@@ -9,6 +9,15 @@ import logging
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
 import numpy as np
+import os
+import sys
+
+# Add parent directory to path to import setup_matlab
+parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+from setup_matlab import get_matlab_engine as get_configured_matlab_engine
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +36,13 @@ class PcCalculationError(Exception):
 
 
 def get_matlab_engine():
-    """Get or initialize the MATLAB Engine singleton.
+    """Get or initialize the MATLAB Engine singleton using setup_matlab.py.
+    
+    This function uses the centralized setup_matlab module which:
+    - Loads paths from .env file
+    - Adds local MATLAB paths (core/matlab)
+    - Adds CARA Analysis Tools paths from environment
+    - Properly initializes MATLAB Engine with all dependencies
     
     Returns:
         matlab.engine instance
@@ -39,30 +54,11 @@ def get_matlab_engine():
     
     if _matlab_engine is None:
         try:
-            import matlab.engine
-            import os
-            logger.info("Starting MATLAB Engine...")
-            _matlab_engine = matlab.engine.start_matlab()
-            
-            # Add local MATLAB function paths (copied from CARA_Analysis_Tools)
-            # Get the absolute path to core/matlab directory
-            core_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            matlab_dir = os.path.join(core_dir, 'matlab')
-            pc3d_utils_dir = os.path.join(matlab_dir, 'Pc3D_Hall_Utils')
-            
-            paths_to_add = [
-                matlab_dir,
-                pc3d_utils_dir,
-            ]
-            
-            for path in paths_to_add:
-                if os.path.exists(path):
-                    _matlab_engine.addpath(path, nargout=0)
-                    logger.info(f"Added MATLAB path: {path}")
-                else:
-                    logger.warning(f"MATLAB path not found: {path}")
-                
-            logger.info("MATLAB Engine initialized successfully")
+            logger.info("Initializing MATLAB Engine with CARA paths...")
+            # Use the centralized setup from setup_matlab.py
+            # This handles .env loading and path configuration
+            _matlab_engine = get_configured_matlab_engine(add_cara_path=True)
+            logger.info("MATLAB Engine initialized successfully with CARA paths")
             
         except ImportError as e:
             raise MatlabEngineError(
