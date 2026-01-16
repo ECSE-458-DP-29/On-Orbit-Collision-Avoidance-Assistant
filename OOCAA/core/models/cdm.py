@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import MinValueValidator
 from .spaceobject import SpaceObject
 
 
@@ -21,6 +22,15 @@ class CDM(models.Model):
     )
     obj2 = models.ForeignKey(
         SpaceObject, related_name="cdms_as_obj2", null=True, blank=True, on_delete=models.SET_NULL
+    )
+    
+    # Event grouping
+    event = models.ForeignKey(
+        'Event',
+        related_name='cdms',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
     )
 
     # State vectors and physical parameters for obj1 and obj2

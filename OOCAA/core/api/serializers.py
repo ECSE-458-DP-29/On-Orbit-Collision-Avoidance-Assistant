@@ -55,6 +55,11 @@ class CDMSerializer(serializers.ModelSerializer):
     create SpaceObjects inline when creating a CDM.
     """
 
+    # Custom fields for relative position (mapped from relative_position JSONField)
+    relative_position_r = serializers.FloatField(required=False, allow_null=True)
+    relative_position_t = serializers.FloatField(required=False, allow_null=True)
+    relative_position_n = serializers.FloatField(required=False, allow_null=True)
+
     class Meta:
         model = CDM
         fields = [
@@ -102,6 +107,18 @@ class CDMSerializer(serializers.ModelSerializer):
     # Use the nested serializer that skips uniqueness validation
     obj1_data = SpaceObjectNestedSerializer(write_only=True, required=False)
     obj2_data = SpaceObjectNestedSerializer(write_only=True, required=False)
+    
+    def to_representation(self, instance):
+        """Override to read relative_position_r/t/n from the relative_position JSONField."""
+        ret = super().to_representation(instance)
+        
+        # Extract r, t, n from the relative_position JSON field
+        if instance.relative_position:
+            ret['relative_position_r'] = instance.relative_position.get('r')
+            ret['relative_position_t'] = instance.relative_position.get('t')
+            ret['relative_position_n'] = instance.relative_position.get('n')
+        
+        return ret
 
     def validate_collision_probability(self, value):
         # Model validators already enforce 0..1 but validate here for clearer API errors
@@ -115,6 +132,19 @@ class CDMSerializer(serializers.ModelSerializer):
         # If nested creation data provided alongside a PK, prefer the explicit PK.
         # Nothing required here otherwise; caller may provide obj1/obj2 as PKs or
         # obj1_data/obj2_data to create them on the fly.
+        
+        # Handle relative_position_r/t/n -> relative_position JSON field
+        rel_r = attrs.pop('relative_position_r', None)
+        rel_t = attrs.pop('relative_position_t', None)
+        rel_n = attrs.pop('relative_position_n', None)
+        
+        # If any relative position component is provided, pack them into the JSON field
+        if any(v is not None for v in [rel_r, rel_t, rel_n]):
+            attrs['relative_position'] = {
+                'r': rel_r,
+                't': rel_t,
+                'n': rel_n,
+            }
         
         # Validate covariance matrices if provided
         for obj_num in [1, 2]:
