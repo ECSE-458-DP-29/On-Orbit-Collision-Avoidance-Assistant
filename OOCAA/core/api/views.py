@@ -13,6 +13,7 @@ from core.services import (
     update_cdm,
     delete_cdm,
     list_events,
+
 )
 from core.services.pc_calculation_service import (
     calculate_pc_multistep,
@@ -25,6 +26,7 @@ from core.services.pc_calculation_service import (
 )
 from core.models.spaceobject import SpaceObject
 from core.models.cdm import CDM
+from core.services.cdm_service import parse_cdm_json
 
 
 def api_index(request):
@@ -380,6 +382,21 @@ class BatchCalculatePcView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+class ParseCDMJsonView(APIView):
+    """API endpoint to parse a CDM JSON and create a CDM object."""
+
+    def post(self, request, *args, **kwargs):
+        try:
+            # Extract JSON data from the request body
+            ## TODO: VERIFY FORMAT OF THE DATA LIST OR DICT
+            data = request.data
+            # Call the parse_cdm_json function
+            cdm, obj1, obj2 = parse_cdm_json(data)
+            # Return the created CDM's ID as a response
+            return Response({"cdm_id": cdm.id, "space_obj1_id": obj1.id,"space_obj2_id": obj2.id,}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            # Handle errors and return a 400 Bad Request response
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
 __all__ = [
     "api_index",
@@ -389,4 +406,5 @@ __all__ = [
     "EventListView",
     "CalculatePcView",
     "BatchCalculatePcView",
+    "ParseCDMJsonView",
 ]

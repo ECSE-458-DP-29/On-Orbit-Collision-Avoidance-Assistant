@@ -371,6 +371,94 @@ def list_events(filters: Optional[Dict[str, Any]] = None) -> 'QuerySet[Event]':
     
     return queryset.order_by('-representative_tca')
 
+def parse_cdm_json(data: dict) -> CDM:
+    """Parse a JSON CDM dictionary and create a CDM object."""
+
+    # Create or fetch SpaceObject 1
+    obj1, created1 = SpaceObject.objects.get_or_create(
+        object_designator=data.get("SAT1_OBJECT_DESIGNATOR"),
+        defaults={
+            "object_name": data.get("SAT1_OBJECT_NAME"),
+            "object_type": data.get("SAT1_OBJECT_TYPE"),
+            "operator_organization": data.get("SAT1_OPERATOR_ORGANIZATION"),
+            "maneuverable": data.get("SAT1_MANEUVERABLE") == "YES",
+        },
+    )
+    if created1:
+        obj1.save()  # Explicitly save the object if it was newly created
+
+    # Create or fetch SpaceObject 2
+    obj2, created2 = SpaceObject.objects.get_or_create(
+        object_designator=data.get("SAT2_OBJECT_DESIGNATOR"),
+        defaults={
+            "object_name": data.get("SAT2_OBJECT_NAME"),
+            "object_type": data.get("SAT2_OBJECT_TYPE"),
+            "operator_organization": data.get("SAT2_OPERATOR_ORGANIZATION"),
+            "maneuverable": data.get("SAT2_MANEUVERABLE") == "YES",
+        },
+    )
+    if created2:
+        obj2.save()  # Explicitly save the object if it was newly created
+
+    # Create the CDM object
+    cdm = CDM.objects.create(
+        cdm_id=data.get("CDM_ID"),
+        message_id=data.get("MESSAGE_ID"),
+        creation_date=data.get("CREATION_DATE"),
+        insert_epoch=data.get("INSERT_EPOCH"),
+        ccsds_version=data.get("CCSDS_CDM_VERS"),
+        originator=data.get("ORIGINATOR"),
+        obj1=obj1,
+        obj2=obj2,
+        state_vector_obj1={
+            "x_km": data.get("SAT1_X"),
+            "y_km": data.get("SAT1_Y"),
+            "z_km": data.get("SAT1_Z"),
+            "xdot_kms": data.get("SAT1_X_DOT"),
+            "ydot_kms": data.get("SAT1_Y_DOT"),
+            "zdot_kms": data.get("SAT1_Z_DOT"),
+        },
+        state_vector_obj2={
+            "x_km": data.get("SAT2_X"),
+            "y_km": data.get("SAT2_Y"),
+            "z_km": data.get("SAT2_Z"),
+            "xdot_kms": data.get("SAT2_X_DOT"),
+            "ydot_kms": data.get("SAT2_Y_DOT"),
+            "zdot_kms": data.get("SAT2_Z_DOT"),
+        },
+        physical_parameters_obj1={
+            "area_pc": data.get("SAT1_AREA_PC"),
+            "cd_area_mass": data.get("SAT1_CD_AREA_OVER_MASS"),
+            "cr_area_mass": data.get("SAT1_CR_AREA_OVER_MASS"),
+        },
+        physical_parameters_obj2={
+            "area_pc": data.get("SAT2_AREA_PC"),
+            "cd_area_mass": data.get("SAT2_CD_AREA_OVER_MASS"),
+            "cr_area_mass": data.get("SAT2_CR_AREA_OVER_MASS"),
+        },
+        tca=data.get("TCA"),
+        miss_distance_m=data.get("MISS_DISTANCE"),
+        relative_speed_ms=data.get("RELATIVE_SPEED"),
+        relative_position={
+            "r": data.get("RELATIVE_POSITION_R"),
+            "t": data.get("RELATIVE_POSITION_T"),
+            "n": data.get("RELATIVE_POSITION_N"),
+        },
+        relative_velocity={
+            "r": data.get("RELATIVE_VELOCITY_R"),
+            "t": data.get("RELATIVE_VELOCITY_T"),
+            "n": data.get("RELATIVE_VELOCITY_N"),
+        },
+        collision_probability=data.get("COLLISION_PROBABILITY"),
+        collision_probability_method=data.get("COLLISION_PROBABILITY_METHOD"),
+        comments={
+            "screening_option": data.get("COMMENT_SCREENING_OPTION"),
+            "effective_hbr": data.get("COMMENT_EFFECTIVE_HBR"),
+        },
+    )
+    cdm.save()  # Explicitly save the CDM object
+
+    return cdm, obj1, obj2
 
 __all__ = [
     'create_cdm',
@@ -381,4 +469,5 @@ __all__ = [
     'assign_cdm_to_event',
     'regroup_all_cdms',
     'list_events',
+    'parse_cdm_json',
 ]
