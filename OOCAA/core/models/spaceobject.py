@@ -10,6 +10,8 @@ class SpaceObject(models.Model):
     object_type = models.CharField(max_length=64, null=True, blank=True)
     operator_organization = models.CharField(max_length=128, null=True, blank=True)
     maneuverable = models.BooleanField(default=False)
+    international_designator = models.CharField(max_length=32, null=True, blank=True)
+
 
     def __str__(self):
         return f"{self.object_designator} ({self.object_name})"

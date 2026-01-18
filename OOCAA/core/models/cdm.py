@@ -9,12 +9,18 @@ class CDM(models.Model):
     """
 
     # Metadata
+    constellation = models.CharField(max_length=128, null=True, blank=True)
     cdm_id = models.CharField(max_length=64, null=True, blank=True)
+    filename = models.CharField(max_length=256, null=True, blank=True)
+    message_for = models.CharField(max_length=128, null=True, blank=True)
     message_id = models.CharField(max_length=128, null=True, blank=True)
     creation_date = models.DateTimeField(null=True, blank=True)
     insert_epoch = models.DateTimeField(null=True, blank=True)
     ccsds_version = models.CharField(max_length=16, null=True, blank=True)
     originator = models.CharField(max_length=128, null=True, blank=True)
+    comment_emergency_reportable = models.TextField(null=True, blank=True)
+
+    extra = models.JSONField(null=True, blank=True, default=dict) #For any extra fields not explicitly modeled
 
     # Space objects involved in the conjunction
     obj1 = models.ForeignKey(

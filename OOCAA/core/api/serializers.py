@@ -59,23 +59,52 @@ class CDMSerializer(serializers.ModelSerializer):
     relative_position_r = serializers.FloatField(required=False, allow_null=True)
     relative_position_t = serializers.FloatField(required=False, allow_null=True)
     relative_position_n = serializers.FloatField(required=False, allow_null=True)
+    # Custom fields for relative velocity (mapped from relative_velocity JSONField)
+    relative_velocity_r = serializers.FloatField(required=False, allow_null=True)
+    relative_velocity_t = serializers.FloatField(required=False, allow_null=True)
+    relative_velocity_n = serializers.FloatField(required=False, allow_null=True)
 
     class Meta:
         model = CDM
         fields = [
             'id',
+            # Metadata
+            'constellation',
+            'cdm_id',
+            'filename',
+            'message_for',
+            'message_id',
+            'creation_date',
+            'insert_epoch',
+            'ccsds_version',
+            'originator',
+            'comment_emergency_reportable',
+            'extra',
+
             'obj1',
             'obj2',
             'tca',
             'event',
             'miss_distance_m',
+            'relative_speed_ms',
             'relative_position_r',
             'relative_position_t',
             'relative_position_n',
+            'relative_velocity_r',
+            'relative_velocity_t',
+            'relative_velocity_n',
             'collision_probability',
             'collision_probability_method',
             'obj1_data',
             'obj2_data',
+            # Full JSON fields
+            'state_vector_obj1',
+            'state_vector_obj2',
+            'physical_parameters_obj1',
+            'physical_parameters_obj2',
+            'relative_position',
+            'relative_velocity',
+            'comments',
             # State vectors (ECI frame)
             'obj1_position_x',
             'obj1_position_y',
@@ -109,15 +138,19 @@ class CDMSerializer(serializers.ModelSerializer):
     obj2_data = SpaceObjectNestedSerializer(write_only=True, required=False)
     
     def to_representation(self, instance):
-        """Override to read relative_position_r/t/n from the relative_position JSONField."""
+        """Override to flatten relative_position and relative_velocity JSON into r/t/n fields."""
         ret = super().to_representation(instance)
-        
-        # Extract r, t, n from the relative_position JSON field
+
         if instance.relative_position:
             ret['relative_position_r'] = instance.relative_position.get('r')
             ret['relative_position_t'] = instance.relative_position.get('t')
             ret['relative_position_n'] = instance.relative_position.get('n')
-        
+
+        if instance.relative_velocity:
+            ret['relative_velocity_r'] = instance.relative_velocity.get('r')
+            ret['relative_velocity_t'] = instance.relative_velocity.get('t')
+            ret['relative_velocity_n'] = instance.relative_velocity.get('n')
+
         return ret
 
     def validate_collision_probability(self, value):
@@ -137,13 +170,26 @@ class CDMSerializer(serializers.ModelSerializer):
         rel_r = attrs.pop('relative_position_r', None)
         rel_t = attrs.pop('relative_position_t', None)
         rel_n = attrs.pop('relative_position_n', None)
-        
+
+        # Handle relative_velocity_r/t/n -> relative_velocity JSON field
+        vel_r = attrs.pop('relative_velocity_r', None)
+        vel_t = attrs.pop('relative_velocity_t', None)
+        vel_n = attrs.pop('relative_velocity_n', None)
+
         # If any relative position component is provided, pack them into the JSON field
         if any(v is not None for v in [rel_r, rel_t, rel_n]):
             attrs['relative_position'] = {
                 'r': rel_r,
                 't': rel_t,
                 'n': rel_n,
+            }
+
+        # If any relative velocity component is provided, pack them into the JSON field
+        if any(v is not None for v in [vel_r, vel_t, vel_n]):
+            attrs['relative_velocity'] = {
+                'r': vel_r,
+                't': vel_t,
+                'n': vel_n,
             }
         
         # Validate covariance matrices if provided
