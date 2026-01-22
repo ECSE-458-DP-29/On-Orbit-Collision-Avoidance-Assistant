@@ -125,6 +125,16 @@ USE_I18N = True
 
 USE_TZ = True
 
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'oocaa_db',
+        'USER': 'postgres',
+        'PASSWORD': '12341234',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
+}
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
