@@ -17,6 +17,12 @@ cp .env.example .env    # Mac/Linux
 
 Edit `.env` and set your local paths:
 
+To get the latest DistributedMatlab please clone 
+
+```bash
+git clone https://github.com/nasa/CARA_Analysis_Tools.git
+```
+
 ```env
 CARA_MATLAB_PATH=C:\Users\YourName\Path\To\CARA_Analysis_Tools\DistributedMatlab
 MATLAB_ROOT=C:\Program Files\MATLAB\R2025b
