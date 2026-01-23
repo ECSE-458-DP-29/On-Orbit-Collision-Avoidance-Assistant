@@ -186,8 +186,9 @@ def cdm_to_matlab_params(cdm) -> Dict[str, Any]:
         ]])
         
         # Covariance matrices (6x6 format)
-        cov1 = matlab.double(cdm.obj1_covariance_matrix)
-        cov2 = matlab.double(cdm.obj2_covariance_matrix)
+        # Convert from m^2 and m^2/s to km^2 and km^2/s
+        cov1 = matlab.double(np.array(cdm.obj1_covariance_matrix) / 1e6)
+        cov2 = matlab.double(np.array(cdm.obj2_covariance_matrix) / 1e6)
         
         # Hard body radius (scalar)
         HBR = float(cdm.hard_body_radius)

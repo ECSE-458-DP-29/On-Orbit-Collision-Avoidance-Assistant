@@ -401,6 +401,24 @@ def parse_cdm_json(data: dict) -> CDM:
         obj2.save()  # Explicitly save the object if it was newly created
 
     # Create the CDM object
+    # Build covariance matrices
+    obj1_cov = [
+        [float(data.get("SAT1_CR_R", 0)), float(data.get("SAT1_CT_R", 0)), float(data.get("SAT1_CN_R", 0)), float(data.get("SAT1_CRDOT_R", 0)), float(data.get("SAT1_CTDOT_R", 0)), float(data.get("SAT1_CNDOT_R", 0))],
+        [float(data.get("SAT1_CT_R", 0)), float(data.get("SAT1_CT_T", 0)), float(data.get("SAT1_CN_T", 0)), float(data.get("SAT1_CRDOT_T", 0)), float(data.get("SAT1_CTDOT_T", 0)), float(data.get("SAT1_CNDOT_T", 0))],
+        [float(data.get("SAT1_CN_R", 0)), float(data.get("SAT1_CN_T", 0)), float(data.get("SAT1_CN_N", 0)), float(data.get("SAT1_CRDOT_N", 0)), float(data.get("SAT1_CTDOT_N", 0)), float(data.get("SAT1_CNDOT_N", 0))],
+        [float(data.get("SAT1_CRDOT_R", 0)), float(data.get("SAT1_CRDOT_T", 0)), float(data.get("SAT1_CRDOT_N", 0)), float(data.get("SAT1_CRDOT_RDOT", 0)), float(data.get("SAT1_CTDOT_RDOT", 0)), float(data.get("SAT1_CNDOT_RDOT", 0))],
+        [float(data.get("SAT1_CTDOT_R", 0)), float(data.get("SAT1_CTDOT_T", 0)), float(data.get("SAT1_CTDOT_N", 0)), float(data.get("SAT1_CTDOT_RDOT", 0)), float(data.get("SAT1_CTDOT_TDOT", 0)), float(data.get("SAT1_CNDOT_TDOT", 0))],
+        [float(data.get("SAT1_CNDOT_R", 0)), float(data.get("SAT1_CNDOT_T", 0)), float(data.get("SAT1_CNDOT_N", 0)), float(data.get("SAT1_CNDOT_RDOT", 0)), float(data.get("SAT1_CNDOT_TDOT", 0)), float(data.get("SAT1_CNDOT_NDOT", 0))]
+    ]
+    obj2_cov = [
+        [float(data.get("SAT2_CR_R", 0)), float(data.get("SAT2_CT_R", 0)), float(data.get("SAT2_CN_R", 0)), float(data.get("SAT2_CRDOT_R", 0)), float(data.get("SAT2_CTDOT_R", 0)), float(data.get("SAT2_CNDOT_R", 0))],
+        [float(data.get("SAT2_CT_R", 0)), float(data.get("SAT2_CT_T", 0)), float(data.get("SAT2_CN_T", 0)), float(data.get("SAT2_CRDOT_T", 0)), float(data.get("SAT2_CTDOT_T", 0)), float(data.get("SAT2_CNDOT_T", 0))],
+        [float(data.get("SAT2_CN_R", 0)), float(data.get("SAT2_CN_T", 0)), float(data.get("SAT2_CN_N", 0)), float(data.get("SAT2_CRDOT_N", 0)), float(data.get("SAT2_CTDOT_N", 0)), float(data.get("SAT2_CNDOT_N", 0))],
+        [float(data.get("SAT2_CRDOT_R", 0)), float(data.get("SAT2_CRDOT_T", 0)), float(data.get("SAT2_CRDOT_N", 0)), float(data.get("SAT2_CRDOT_RDOT", 0)), float(data.get("SAT2_CTDOT_RDOT", 0)), float(data.get("SAT2_CNDOT_RDOT", 0))],
+        [float(data.get("SAT2_CTDOT_R", 0)), float(data.get("SAT2_CTDOT_T", 0)), float(data.get("SAT2_CTDOT_N", 0)), float(data.get("SAT2_CTDOT_RDOT", 0)), float(data.get("SAT2_CTDOT_TDOT", 0)), float(data.get("SAT2_CNDOT_TDOT", 0))],
+        [float(data.get("SAT2_CNDOT_R", 0)), float(data.get("SAT2_CNDOT_T", 0)), float(data.get("SAT2_CNDOT_N", 0)), float(data.get("SAT2_CNDOT_RDOT", 0)), float(data.get("SAT2_CNDOT_TDOT", 0)), float(data.get("SAT2_CNDOT_NDOT", 0))]
+    ]
+
     cdm = CDM.objects.create(
         cdm_id=data.get("CDM_ID"),
         message_id=data.get("MESSAGE_ID"),
@@ -410,6 +428,24 @@ def parse_cdm_json(data: dict) -> CDM:
         originator=data.get("ORIGINATOR"),
         obj1=obj1,
         obj2=obj2,
+        # Flat fields for positions and velocities
+        obj1_position_x=float(data.get("SAT1_X")),
+        obj1_position_y=float(data.get("SAT1_Y")),
+        obj1_position_z=float(data.get("SAT1_Z")),
+        obj1_velocity_x=float(data.get("SAT1_X_DOT")),
+        obj1_velocity_y=float(data.get("SAT1_Y_DOT")),
+        obj1_velocity_z=float(data.get("SAT1_Z_DOT")),
+        obj2_position_x=float(data.get("SAT2_X")),
+        obj2_position_y=float(data.get("SAT2_Y")),
+        obj2_position_z=float(data.get("SAT2_Z")),
+        obj2_velocity_x=float(data.get("SAT2_X_DOT")),
+        obj2_velocity_y=float(data.get("SAT2_Y_DOT")),
+        obj2_velocity_z=float(data.get("SAT2_Z_DOT")),
+        # Covariance matrices
+        obj1_covariance_matrix=obj1_cov,
+        obj2_covariance_matrix=obj2_cov,
+        # Hard body radius (default if not provided)
+        hard_body_radius=float(data.get("HARD_BODY_RADIUS", 0.01)),
         state_vector_obj1={
             "x_km": data.get("SAT1_X"),
             "y_km": data.get("SAT1_Y"),
