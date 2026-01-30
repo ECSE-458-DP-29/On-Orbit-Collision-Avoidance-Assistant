@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Manage CDMs - OOCAA{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="page-header">
+            <h1>Manage CDMs</h1>
+            <p class="text-muted">View, filter, and manage Conjunction Data Messages</p>
+        </div>
+    </div>
+</div>
+
+<!-- Filters Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Filters</h5>
+            </div>
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="cdmId" class="form-label">CDM ID</label>
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            id="cdmId" 
+                            name="cdm_id" 
+                            placeholder="e.g., CDM001"
+                            value="{{ filters.cdm_id|default:'' }}"
+                        >
+                    </div>
+                    <div class="col-md-3">
+                        <label for="obj1" class="form-label">Object 1</label>
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            id="obj1" 
+                            name="obj1_id" 
+                            placeholder="Object designator"
+                            value="{{ filters.obj1_id|default:'' }}"
+                        >
+                    </div>
+                    <div class="col-md-3">
+                        <label for="obj2" class="form-label">Object 2</label>
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            id="obj2" 
+                            name="obj2_id" 
+                            placeholder="Object designator"
+                            value="{{ filters.obj2_id|default:'' }}"
+                        >
+                    </div>
+                    <div class="col-md-3">
+                        <label for="pcMin" class="form-label">Pc Min</label>
+                        <input 
+                            type="number" 
+                            step="0.0001"
+                            min="0"
+                            max="1"
+                            class="form-control" 
+                            id="pcMin" 
+                            name="pc_min" 
+                            placeholder="0.0"
+                            value="{{ filters.pc_min|default:'' }}"
+                        >
+                    </div>
+                    <div class="col-md-3">
+                        <label for="pcMax" class="form-label">Pc Max</label>
+                        <input 
+                            type="number" 
+                            step="0.0001"
+                            min="0"
+                            max="1"
+                            class="form-control" 
+                            id="pcMax" 
+                            name="pc_max" 
+                            placeholder="1.0"
+                            value="{{ filters.pc_max|default:'' }}"
+                        >
+                    </div>
+                    <div class="col-md-3">
+                        <label for="sortBy" class="form-label">Sort By</label>
+                        <select class="form-select" id="sortBy" name="sort_by">
+                            <option value="-creation_date" {% if filters.sort_by == "-creation_date" %}selected{% endif %}>Newest First</option>
+                            <option value="creation_date" {% if filters.sort_by == "creation_date" %}selected{% endif %}>Oldest First</option>
+                            <option value="-collision_probability" {% if filters.sort_by == "-collision_probability" %}selected{% endif %}>Highest Pc</option>
+                            <option value="collision_probability" {% if filters.sort_by == "collision_probability" %}selected{% endif %}>Lowest Pc</option>
+                            <option value="cdm_id" {% if filters.sort_by == "cdm_id" %}selected{% endif %}>CDM ID (A-Z)</option>
+                        </select>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        <a href="/manage/cdms/" class="btn btn-secondary">Reset</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CDMs Table Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">CDMs ({{ cdms.count }} total)</h5>
+                <a href="/upload/cdm/" class="btn btn-sm btn-success">+ Upload New CDM</a>
+            </div>
+            <div class="card-body">
+                {% if cdms %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>CDM ID</th>
+                                <th>Object 1</th>
+                                <th>Object 2</th>
+                                <th>Creation Date</th>
+                                <th>TCA</th>
+                                <th>Pc</th>
+                                <th>Minimum Distance (km)</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cdm in cdms %}
+                            <tr>
+                                <td><strong>{{ cdm.cdm_id }}</strong></td>
+                                <td>
+                                    <a href="/spaceobjects/{{ cdm.obj1.id }}/">
+                                        {{ cdm.obj1.object_designator }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <a href="/spaceobjects/{{ cdm.obj2.id }}/">
+                                        {{ cdm.obj2.object_designator }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <small>{{ cdm.creation_date|date:"Y-m-d H:i" }}</small>
+                                </td>
+                                <td>
+                                    <small>{{ cdm.tca|date:"Y-m-d H:i" }}</small>
+                                </td>
+                                <td>
+                                    {% if cdm.collision_probability %}
+                                        <span class="badge {% if cdm.collision_probability > 0.01 %}bg-danger{% elif cdm.collision_probability > 0.001 %}bg-warning{% else %}bg-success{% endif %}">
+                                            {{ cdm.collision_probability|floatformat:6 }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if cdm.miss_distance_m %}
+                                        {{ cdm.miss_distance_m|floatformat:2 }}
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if cdm.collision_probability %}
+                                        {% if cdm.collision_probability > 0.01 %}
+                                            <span class="badge bg-danger">HIGH RISK</span>
+                                        {% elif cdm.collision_probability > 0.001 %}
+                                            <span class="badge bg-warning">MEDIUM RISK</span>
+                                        {% else %}
+                                            <span class="badge bg-success">LOW RISK</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-info">PENDING</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="/cdms/{{ cdm.id }}/" class="btn btn-info" title="View Details">
+                                            View
+                                        </a>
+                                        <form method="post" action="/manage/cdms/" style="display: inline;" onsubmit="return confirm('Delete this CDM?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="cdm_id" value="{{ cdm.id }}">
+                                            <button type="submit" class="btn btn-danger" title="Delete CDM">
+                                                Delete
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if is_paginated %}
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1">First</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                        </li>
+                        {% endif %}
+
+                        <li class="page-item active">
+                            <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                        </li>
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+
+                {% else %}
+                <div class="alert alert-info" role="alert">
+                    <strong>No CDMs found.</strong> Try adjusting your filters or <a href="/cdms/">create a new CDM</a>.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

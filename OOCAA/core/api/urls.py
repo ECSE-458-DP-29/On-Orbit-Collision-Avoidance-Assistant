@@ -6,6 +6,8 @@ Provides RESTful endpoints for CDM and SpaceObject management.
 from django.urls import path
 from .views import (
     api_index,
+    manage_cdms,
+    upload_cdm,
     CDMListCreateView,
     CDMDetailView,
     SpaceObjectListCreateView,
@@ -17,7 +19,11 @@ from .views import (
 
 urlpatterns = [
     # Landing page
-    path('', api_index, name='api-index'),
+    path('api/', api_index, name='api-index'),
+    
+    # Management pages
+    path('manage/cdms/', manage_cdms, name='manage-cdms'),
+    path('upload/cdm/', upload_cdm, name='upload-cdm'),
     
     # CDM endpoints
     path('cdms/', CDMListCreateView.as_view(), name='cdm-list-create'),

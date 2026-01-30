@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Home - OOCAA{% endblock %}
+
+{% block content %}
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="jumbotron" style="background: linear-gradient(135deg, #1a3a52 0%, #2d5a7b 100%); color: white; padding: 60px 30px; border-radius: 10px;">
+            <h1 class="display-4">Welcome to OOCAA</h1>
+            <p class="lead">On-Orbit Collision Avoidance Assistant</p>
+            <hr class="my-4" style="background-color: white;">
+            <p>A comprehensive tool for analyzing and managing conjunction data messages (CDMs) and collision probability calculations for spacecraft in orbit.</p>
+            {% if user.is_authenticated %}
+            <p class="mt-4">
+                <strong>Logged in as:</strong> {{ user.username }}
+            </p>
+            <a class="btn btn-light btn-lg" href="/manage/cdms/" role="button">
+                → Go to Manage CDMs
+            </a>
+            {% else %}
+            <a class="btn btn-light btn-lg" href="/login/" role="button">
+                → Login to Get Started
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">📊 Manage CDMs</h5>
+                <p class="card-text">View, filter, and manage Conjunction Data Messages with detailed collision probability analysis.</p>
+                {% if user.is_authenticated %}
+                <a href="/manage/cdms/" class="btn btn-sm btn-primary">Access CDM Manager</a>
+                {% else %}
+                <p class="text-muted small">Login to access</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">🔧 API</h5>
+                <p class="card-text">RESTful API endpoints for CDM creation, retrieval, and probability calculations.</p>
+                <a href="/api/" class="btn btn-sm btn-secondary">View API Docs</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">⚙️ Administration</h5>
+                <p class="card-text">Django admin panel for system administration and user management.</p>
+                {% if user.is_superuser %}
+                <a href="/admin/" class="btn btn-sm btn-danger">Admin Panel</a>
+                {% else %}
+                <p class="text-muted small">Admin access required</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5 class="card-title">📖 About OOCAA</h5>
+                <p class="card-text">
+                    OOCAA is a specialized tool for aerospace professionals and operators managing satellite operations. 
+                    It provides real-time analysis of conjunction data, probability of collision calculations, and risk assessment 
+                    to support decision-making in conjunction assessment and avoidance maneuvering.
+                </p>
+                <p class="card-text">
+                    Key features include CDM ingestion, collision probability calculation using CARA MATLAB tools, 
+                    event tracking, and comprehensive filtering and search capabilities.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
