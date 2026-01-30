@@ -1,5 +1,12 @@
 """API views for CDM and SpaceObject management."""
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import logout
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.contrib import messages
+from django.views.generic import View
+import json
 
 from rest_framework import status, generics
 from rest_framework.response import Response
@@ -32,6 +39,200 @@ from core.services.cdm_service import parse_cdm_json
 def api_index(request):
     """Render a small landing page for the API area."""
     return render(request, "api_index.html", {"message": "Core API landing page"})
+
+
+def home(request):
+    """Render the home page."""
+    return render(request, "home.html")
+
+
+class CustomLogoutView(View):
+    """Custom logout view that handles both GET and POST requests."""
+    def get(self, request):
+        logout(request)
+        return redirect('home')
+    
+    def post(self, request):
+        logout(request)
+        return redirect('home')
+
+
+@login_required(login_url='/login/')
+def manage_cdms(request):
+    """Manage CDMs page with filtering and pagination.
+    
+    GET: Display CDMs with filters and sorting
+    POST: Handle delete actions via form submission
+    """
+    # Handle POST requests (delete actions)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        cdm_id = request.POST.get('cdm_id')
+        
+        if action == 'delete' and cdm_id:
+            try:
+                cdm = CDM.objects.get(id=cdm_id)
+                cdm_name = cdm.cdm_id
+                cdm.delete()
+                messages.success(request, f"CDM '{cdm_name}' deleted successfully.")
+            except CDM.DoesNotExist:
+                messages.error(request, "CDM not found.")
+            except Exception as e:
+                messages.error(request, f"Error deleting CDM: {str(e)}")
+        
+        return redirect('manage-cdms')
+    
+    # Handle GET requests (display and filter)
+    cdms = CDM.objects.all().select_related('obj1', 'obj2', 'event')
+    
+    # Build filter parameters for display
+    filters = {
+        'cdm_id': request.GET.get('cdm_id', ''),
+        'obj1_id': request.GET.get('obj1_id', ''),
+        'obj2_id': request.GET.get('obj2_id', ''),
+        'pc_min': request.GET.get('pc_min', ''),
+        'pc_max': request.GET.get('pc_max', ''),
+        'sort_by': request.GET.get('sort_by', '-creation_date'),
+    }
+    
+    # Apply filters
+    if filters['cdm_id']:
+        cdms = cdms.filter(cdm_id__icontains=filters['cdm_id'])
+    
+    if filters['obj1_id']:
+        cdms = cdms.filter(obj1__object_designator__icontains=filters['obj1_id'])
+    
+    if filters['obj2_id']:
+        cdms = cdms.filter(obj2__object_designator__icontains=filters['obj2_id'])
+    
+    if filters['pc_min']:
+        try:
+            pc_min = float(filters['pc_min'])
+            cdms = cdms.filter(collision_probability__gte=pc_min)
+        except ValueError:
+            pass
+    
+    if filters['pc_max']:
+        try:
+            pc_max = float(filters['pc_max'])
+            cdms = cdms.filter(collision_probability__lte=pc_max)
+        except ValueError:
+            pass
+    
+    # Apply sorting
+    sort_by = filters['sort_by']
+    if sort_by in ['-creation_date', 'creation_date', '-collision_probability', 'collision_probability', 'cdm_id']:
+        cdms = cdms.order_by(sort_by)
+    else:
+        cdms = cdms.order_by('-creation_date')
+    
+    # Pagination
+    paginator = Paginator(cdms, 25)  # 25 CDMs per page
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'cdms': page_obj.object_list,
+        'page_obj': page_obj,
+        'is_paginated': page_obj.has_other_pages(),
+        'filters': filters,
+    }
+    
+    return render(request, 'manage_cdms.html', context)
+
+
+@login_required(login_url='/login/')
+def upload_cdm(request):
+    """Handle CDM file uploads.
+    
+    GET: Display upload form
+    POST: Process uploaded file and create CDM(s)
+    """
+    if request.method == 'POST':
+        uploaded_file = request.FILES.get('cdm_file')
+        auto_calculate_pc = request.POST.get('auto_calculate_pc') == 'on'
+        
+        if not uploaded_file:
+            messages.error(request, 'No file selected.')
+            return redirect('upload-cdm')
+        
+        if not uploaded_file.name.endswith('.json'):
+            messages.error(request, 'Please upload a JSON file.')
+            return redirect('upload-cdm')
+        
+        try:
+            # Read and parse JSON
+            file_content = uploaded_file.read().decode('utf-8')
+            data = json.loads(file_content)
+            
+            # Handle both single object and array of objects
+            if isinstance(data, dict):
+                data = [data]
+            elif not isinstance(data, list):
+                messages.error(request, 'Invalid JSON format. Expected object or array.')
+                return redirect('upload-cdm')
+            
+            # Process each CDM in the file
+            successful = 0
+            failed = 0
+            errors = []
+            
+            for idx, cdm_data in enumerate(data):
+                try:
+                    # Wrap in transaction for atomicity
+                    from django.db import transaction
+                    with transaction.atomic():
+                        cdm, obj1, obj2 = parse_cdm_json(cdm_data)
+                        successful += 1
+                        
+                        # Optionally calculate Pc
+                        if auto_calculate_pc:
+                            try:
+                                result = calculate_pc_multistep(cdm, None)
+                                if result.get('success'):
+                                    update_cdm_with_pc_result(cdm, result, save=True)
+                            except Exception as e:
+                                # Don't fail the CDM upload if Pc calculation fails
+                                messages.warning(request, f'CDM {cdm.cdm_id} uploaded but Pc calculation failed: {str(e)}')
+                                
+                except ValueError as e:
+                    failed += 1
+                    error_msg = f'CDM #{idx+1}: {str(e)}'
+                    errors.append(error_msg)
+                except Exception as e:
+                    failed += 1
+                    error_msg = f'CDM #{idx+1}: {str(e)}'
+                    errors.append(error_msg)
+            
+            # Report results
+            if successful > 0:
+                msg = f'✓ Successfully uploaded {successful} CDM{"s" if successful != 1 else ""}.'
+                if failed > 0:
+                    msg += f' ✗ {failed} CDM{"s" if failed != 1 else ""} failed.'
+                messages.success(request, msg)
+                
+                if errors:
+                    for error in errors:
+                        messages.warning(request, error)
+            else:
+                messages.error(request, f'✗ Failed to process any CDMs from the file.')
+                if errors:
+                    for error in errors:
+                        messages.error(request, error)
+            
+            return redirect('manage-cdms')
+            
+        except json.JSONDecodeError as e:
+            messages.error(request, f'Invalid JSON file: {str(e)}')
+            return redirect('upload-cdm')
+        except Exception as e:
+            messages.error(request, f'Error processing file: {str(e)}')
+            import traceback
+            messages.error(request, f'Details: {traceback.format_exc()}')
+            return redirect('upload-cdm')
+    
+    # GET request - show upload form
+    return render(request, 'upload_cdm.html')
 
 
 class CDMListCreateView(APIView):
@@ -399,7 +600,11 @@ class ParseCDMJsonView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
 __all__ = [
+    "home",
+    "CustomLogoutView",
     "api_index",
+    "manage_cdms",
+    "upload_cdm",
     "CDMListCreateView",
     "CDMDetailView",
     "SpaceObjectListCreateView",

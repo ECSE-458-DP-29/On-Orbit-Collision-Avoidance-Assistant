@@ -3,7 +3,7 @@
 Keep creation/auxiliary logic here so views/controllers stay thin.
 """
 from typing import Any, Dict, Optional
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.core.exceptions import ValidationError
@@ -240,13 +240,18 @@ def assign_cdm_to_event(cdm: CDM, tca_threshold_seconds: int = 10) -> Event:
     if not cdm.obj1 or not cdm.obj2:
         raise ValueError("CDM must have both obj1 and obj2 to be assigned to an event")
     
+    # Parse TCA if it's a string
+    if isinstance(cdm.tca, str):
+        cdm_tca = datetime.fromisoformat(cdm.tca.replace('Z', '+00:00')).replace(tzinfo=None)
+    else:
+        cdm_tca = cdm.tca
     # Normalize object pair order (always store lower ID first)
     obj1, obj2 = _normalize_object_pair(cdm.obj1, cdm.obj2)
     
     # Look for existing events with the same object pair and nearby TCA
     tca_threshold = timedelta(seconds=tca_threshold_seconds)
-    tca_min = cdm.tca - tca_threshold
-    tca_max = cdm.tca + tca_threshold
+    tca_min = cdm_tca - tca_threshold
+    tca_max = cdm_tca + tca_threshold
     
     matching_event = Event.objects.filter(
         obj1=obj1,
@@ -265,7 +270,7 @@ def assign_cdm_to_event(cdm: CDM, tca_threshold_seconds: int = 10) -> Event:
         event = Event.objects.create(
             obj1=obj1,
             obj2=obj2,
-            representative_tca=cdm.tca,
+            representative_tca=cdm_tca,
         )
         cdm.event = event
         cdm.save(update_fields=['event'])
@@ -372,7 +377,17 @@ def list_events(filters: Optional[Dict[str, Any]] = None) -> 'QuerySet[Event]':
     return queryset.order_by('-representative_tca')
 
 def parse_cdm_json(data: dict) -> CDM:
-    """Parse a JSON CDM dictionary and create a CDM object."""
+    """Parse a JSON CDM dictionary and create a CDM object.
+    
+    Raises:
+        ValueError: If required fields are missing
+        KeyError: If critical fields cannot be parsed
+    """
+    # Validate required fields
+    required_fields = ['SAT1_OBJECT_DESIGNATOR', 'SAT2_OBJECT_DESIGNATOR', 'TCA', 'CREATION_DATE']
+    missing_fields = [f for f in required_fields if not data.get(f)]
+    if missing_fields:
+        raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
 
     # Create or fetch SpaceObject 1
     obj1, created1 = SpaceObject.objects.get_or_create(
@@ -419,8 +434,27 @@ def parse_cdm_json(data: dict) -> CDM:
         [float(data.get("SAT2_CNDOT_R", 0)), float(data.get("SAT2_CNDOT_T", 0)), float(data.get("SAT2_CNDOT_N", 0)), float(data.get("SAT2_CNDOT_RDOT", 0)), float(data.get("SAT2_CNDOT_TDOT", 0)), float(data.get("SAT2_CNDOT_NDOT", 0))]
     ]
 
+    # Use MESSAGE_ID as cdm_id if CDM_ID not provided
+    cdm_id = data.get("CDM_ID") or data.get("MESSAGE_ID") or f"CDM_{obj1.object_designator}_{obj2.object_designator}"
+    
+    # Parse collision probability as float
+    collision_probability = None
+    if data.get("COLLISION_PROBABILITY"):
+        try:
+            collision_probability = float(data.get("COLLISION_PROBABILITY"))
+        except (ValueError, TypeError):
+            collision_probability = None
+    
+    # Parse miss distance as float
+    miss_distance = None
+    if data.get("MISS_DISTANCE"):
+        try:
+            miss_distance = float(data.get("MISS_DISTANCE"))
+        except (ValueError, TypeError):
+            miss_distance = None
+
     cdm = CDM.objects.create(
-        cdm_id=data.get("CDM_ID"),
+        cdm_id=cdm_id,
         message_id=data.get("MESSAGE_ID"),
         creation_date=data.get("CREATION_DATE"),
         insert_epoch=data.get("INSERT_EPOCH"),
@@ -429,18 +463,18 @@ def parse_cdm_json(data: dict) -> CDM:
         obj1=obj1,
         obj2=obj2,
         # Flat fields for positions and velocities
-        obj1_position_x=float(data.get("SAT1_X")),
-        obj1_position_y=float(data.get("SAT1_Y")),
-        obj1_position_z=float(data.get("SAT1_Z")),
-        obj1_velocity_x=float(data.get("SAT1_X_DOT")),
-        obj1_velocity_y=float(data.get("SAT1_Y_DOT")),
-        obj1_velocity_z=float(data.get("SAT1_Z_DOT")),
-        obj2_position_x=float(data.get("SAT2_X")),
-        obj2_position_y=float(data.get("SAT2_Y")),
-        obj2_position_z=float(data.get("SAT2_Z")),
-        obj2_velocity_x=float(data.get("SAT2_X_DOT")),
-        obj2_velocity_y=float(data.get("SAT2_Y_DOT")),
-        obj2_velocity_z=float(data.get("SAT2_Z_DOT")),
+        obj1_position_x=float(data.get("SAT1_X", 0)),
+        obj1_position_y=float(data.get("SAT1_Y", 0)),
+        obj1_position_z=float(data.get("SAT1_Z", 0)),
+        obj1_velocity_x=float(data.get("SAT1_X_DOT", 0)),
+        obj1_velocity_y=float(data.get("SAT1_Y_DOT", 0)),
+        obj1_velocity_z=float(data.get("SAT1_Z_DOT", 0)),
+        obj2_position_x=float(data.get("SAT2_X", 0)),
+        obj2_position_y=float(data.get("SAT2_Y", 0)),
+        obj2_position_z=float(data.get("SAT2_Z", 0)),
+        obj2_velocity_x=float(data.get("SAT2_X_DOT", 0)),
+        obj2_velocity_y=float(data.get("SAT2_Y_DOT", 0)),
+        obj2_velocity_z=float(data.get("SAT2_Z_DOT", 0)),
         # Covariance matrices
         obj1_covariance_matrix=obj1_cov,
         obj2_covariance_matrix=obj2_cov,
@@ -472,8 +506,6 @@ def parse_cdm_json(data: dict) -> CDM:
             "cd_area_mass": data.get("SAT2_CD_AREA_OVER_MASS"),
             "cr_area_mass": data.get("SAT2_CR_AREA_OVER_MASS"),
         },
-        tca=data.get("TCA"),
-        miss_distance_m=data.get("MISS_DISTANCE"),
         relative_speed_ms=data.get("RELATIVE_SPEED"),
         relative_position={
             "r": data.get("RELATIVE_POSITION_R"),
@@ -485,14 +517,18 @@ def parse_cdm_json(data: dict) -> CDM:
             "t": data.get("RELATIVE_VELOCITY_T"),
             "n": data.get("RELATIVE_VELOCITY_N"),
         },
-        collision_probability=data.get("COLLISION_PROBABILITY"),
+        collision_probability=collision_probability,
         collision_probability_method=data.get("COLLISION_PROBABILITY_METHOD"),
         comments={
             "screening_option": data.get("COMMENT_SCREENING_OPTION"),
             "effective_hbr": data.get("COMMENT_EFFECTIVE_HBR"),
         },
+        tca=data.get("TCA"),
+        miss_distance_m=miss_distance,
     )
+    
     cdm.save()  # Explicitly save the CDM object
+    assign_cdm_to_event(cdm)
 
     return cdm, obj1, obj2
 
