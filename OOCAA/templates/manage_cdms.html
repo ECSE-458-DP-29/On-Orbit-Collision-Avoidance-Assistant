@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load formatting %}
 
 {% block title %}Manage CDMs - OOCAA{% endblock %}
 
@@ -150,7 +151,7 @@
                                 <td>
                                     {% if cdm.collision_probability %}
                                         <span class="badge {% if cdm.collision_probability > 0.01 %}bg-danger{% elif cdm.collision_probability > 0.001 %}bg-warning{% else %}bg-success{% endif %}">
-                                            {{ cdm.collision_probability|floatformat:6 }}
+                                            {{ cdm.collision_probability|sci_notation:5 }}
                                         </span>
                                     {% else %}
                                         <span class="badge bg-secondary">N/A</span>

@@ -3,7 +3,7 @@
 Keep creation/auxiliary logic here so views/controllers stay thin.
 """
 from typing import Any, Dict, Optional
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.core.exceptions import ValidationError
@@ -240,13 +240,18 @@ def assign_cdm_to_event(cdm: CDM, tca_threshold_seconds: int = 10) -> Event:
     if not cdm.obj1 or not cdm.obj2:
         raise ValueError("CDM must have both obj1 and obj2 to be assigned to an event")
     
+    # Parse TCA if it's a string
+    if isinstance(cdm.tca, str):
+        cdm_tca = datetime.fromisoformat(cdm.tca.replace('Z', '+00:00')).replace(tzinfo=None)
+    else:
+        cdm_tca = cdm.tca
     # Normalize object pair order (always store lower ID first)
     obj1, obj2 = _normalize_object_pair(cdm.obj1, cdm.obj2)
     
     # Look for existing events with the same object pair and nearby TCA
     tca_threshold = timedelta(seconds=tca_threshold_seconds)
-    tca_min = cdm.tca - tca_threshold
-    tca_max = cdm.tca + tca_threshold
+    tca_min = cdm_tca - tca_threshold
+    tca_max = cdm_tca + tca_threshold
     
     matching_event = Event.objects.filter(
         obj1=obj1,
@@ -265,7 +270,7 @@ def assign_cdm_to_event(cdm: CDM, tca_threshold_seconds: int = 10) -> Event:
         event = Event.objects.create(
             obj1=obj1,
             obj2=obj2,
-            representative_tca=cdm.tca,
+            representative_tca=cdm_tca,
         )
         cdm.event = event
         cdm.save(update_fields=['event'])
@@ -521,7 +526,9 @@ def parse_cdm_json(data: dict) -> CDM:
         tca=data.get("TCA"),
         miss_distance_m=miss_distance,
     )
+    
     cdm.save()  # Explicitly save the CDM object
+    assign_cdm_to_event(cdm)
 
     return cdm, obj1, obj2
 
