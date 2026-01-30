@@ -50,7 +50,7 @@ class CDM(models.Model):
 
     # Collision probability
     collision_probability = models.DecimalField(
-        max_digits=20, decimal_places=12, null=True, blank=True
+        max_digits=100, decimal_places=100, null=True, blank=True
     )
     collision_probability_method = models.CharField(max_length=64, null=True, blank=True)
 
