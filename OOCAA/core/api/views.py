@@ -46,6 +46,11 @@ def home(request):
     return render(request, "home.html")
 
 
+def globe(request):
+    """Render the 3D globe viewer page."""
+    return render(request, "globe.html")
+
+
 class CustomLogoutView(View):
     """Custom logout view that handles both GET and POST requests."""
     def get(self, request):

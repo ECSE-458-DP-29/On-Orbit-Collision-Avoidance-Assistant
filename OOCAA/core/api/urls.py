@@ -8,6 +8,7 @@ from .views import (
     api_index,
     manage_cdms,
     upload_cdm,
+    globe,
     CDMListCreateView,
     CDMDetailView,
     SpaceObjectListCreateView,
@@ -20,6 +21,7 @@ from .views import (
 urlpatterns = [
     # Landing page
     path('api/', api_index, name='api-index'),
+    path('globe/', globe, name='globe'),
     
     # Management pages
     path('manage/cdms/', manage_cdms, name='manage-cdms'),
