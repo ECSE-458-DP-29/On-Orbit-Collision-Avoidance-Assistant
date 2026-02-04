@@ -47,8 +47,48 @@ def home(request):
 
 
 def globe(request):
-    """Render the 3D globe viewer page."""
-    return render(request, "globe.html")
+    """Render the 3D globe viewer page with satellite data from CDM."""
+    # Fetch all CDMs with related SpaceObjects
+    cdms = CDM.objects.all().select_related('obj1', 'obj2')
+    # Serialize CDM data to JSON for JavaScript
+    cdm_data = []
+    for cdm in cdms:
+        cdm_data.append({
+            'obj1_name': cdm.obj1.object_name if cdm.obj1 else 'Unknown',
+            'obj1_x': cdm.obj1_position_x,
+            'obj1_y': cdm.obj1_position_y,
+            'obj1_z': cdm.obj1_position_z,
+            'obj2_name': cdm.obj2.object_name if cdm.obj2 else 'Unknown',
+            'obj2_x': cdm.obj2_position_x,
+            'obj2_y': cdm.obj2_position_y,
+            'obj2_z': cdm.obj2_position_z,
+        })
+    context = {'cdms_json': json.dumps(cdm_data)}
+    return render(request, "globe.html", context)
+
+
+@login_required(login_url='/login/')
+def view_cdm(request, pk):
+    """Display detailed view of a specific CDM.
+    
+    GET: Display all attributes of a CDM
+    """
+    try:
+        cdm = CDM.objects.get(pk=pk)
+    except CDM.DoesNotExist:
+        messages.error(request, "CDM not found.")
+        return redirect('manage-cdms')
+    
+    # Get all CDM attributes
+    context = {
+        'cdm': cdm,
+        'cdm_id': cdm.cdm_id,
+        'obj1': cdm.obj1,
+        'obj2': cdm.obj2,
+        'event': cdm.event,
+    }
+    
+    return render(request, 'view_cdm.html', context)
 
 
 class CustomLogoutView(View):
@@ -95,6 +135,7 @@ def manage_cdms(request):
         'cdm_id': request.GET.get('cdm_id', ''),
         'obj1_id': request.GET.get('obj1_id', ''),
         'obj2_id': request.GET.get('obj2_id', ''),
+        'event_id': request.GET.get('event_id', ''),
         'pc_min': request.GET.get('pc_min', ''),
         'pc_max': request.GET.get('pc_max', ''),
         'sort_by': request.GET.get('sort_by', '-creation_date'),
@@ -109,6 +150,13 @@ def manage_cdms(request):
     
     if filters['obj2_id']:
         cdms = cdms.filter(obj2__object_designator__icontains=filters['obj2_id'])
+    
+    if filters['event_id']:
+        try:
+            event_id = int(filters['event_id'])
+            cdms = cdms.filter(event_id=event_id)
+        except ValueError:
+            pass
     
     if filters['pc_min']:
         try:
@@ -126,7 +174,7 @@ def manage_cdms(request):
     
     # Apply sorting
     sort_by = filters['sort_by']
-    if sort_by in ['-creation_date', 'creation_date', '-collision_probability', 'collision_probability', 'cdm_id']:
+    if sort_by in ['-creation_date', 'creation_date', '-collision_probability', 'collision_probability', 'cdm_id', 'event_id', '-event_id']:
         cdms = cdms.order_by(sort_by)
     else:
         cdms = cdms.order_by('-creation_date')
@@ -606,6 +654,8 @@ class ParseCDMJsonView(APIView):
     
 __all__ = [
     "home",
+    "globe",
+    "view_cdm",
     "CustomLogoutView",
     "api_index",
     "manage_cdms",

@@ -14,9 +14,14 @@
             <p class="mt-4">
                 <strong>Logged in as:</strong> {{ user.username }}
             </p>
-            <a class="btn btn-light btn-lg" href="/manage/cdms/" role="button">
-                → Go to Manage CDMs
-            </a>
+            <div>
+                <a class="btn btn-light btn-lg" href="/manage/cdms/" role="button">
+                    Manage CDMs
+                </a>
+                <a class="btn btn-light btn-lg" href="/globe" role="button">
+                    🌐 Globe
+                </a>
+            </div>
             {% else %}
             <a class="btn btn-light btn-lg" href="/login/" role="button">
                 → Login to Get Started
@@ -27,20 +32,6 @@
 </div>
 
 <div class="row mt-5">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">📊 Manage CDMs</h5>
-                <p class="card-text">View, filter, and manage Conjunction Data Messages with detailed collision probability analysis.</p>
-                {% if user.is_authenticated %}
-                <a href="/manage/cdms/" class="btn btn-sm btn-primary">Access CDM Manager</a>
-                {% else %}
-                <p class="text-muted small">Login to access</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    
     <div class="col-md-4">
         <div class="card">
             <div class="card-body">

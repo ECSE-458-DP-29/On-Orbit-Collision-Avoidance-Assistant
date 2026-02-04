@@ -9,6 +9,7 @@ from .views import (
     manage_cdms,
     upload_cdm,
     globe,
+    view_cdm,
     CDMListCreateView,
     CDMDetailView,
     SpaceObjectListCreateView,
@@ -29,7 +30,7 @@ urlpatterns = [
     
     # CDM endpoints
     path('cdms/', CDMListCreateView.as_view(), name='cdm-list-create'),
-    path('cdms/<int:pk>/', CDMDetailView.as_view(), name='cdm-detail'),
+    path('cdms/<int:pk>/', view_cdm, name='cdm-detail'),
     path('cdms/parse/', ParseCDMJsonView.as_view(), name='cdm-parse'),
     
     # Pc calculation endpoints

@@ -28,18 +28,84 @@
       terrain: Cesium.Terrain.fromWorldTerrain(),
     });    
 
-    // Fly the camera to San Francisco at the given longitude, latitude, and height.
+    // Fly the camera to view the entire globe.
     viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(-122.4175, 37.655, 400),
+      destination: Cesium.Cartesian3.fromDegrees(0, 0, 50000000),
       orientation: {
         heading: Cesium.Math.toRadians(0.0),
-        pitch: Cesium.Math.toRadians(-15.0),
+        pitch: Cesium.Math.toRadians(-90.0),
       }
     });
 
     // Add Cesium OSM Buildings, a global 3D buildings layer.
     const buildingTileset = await Cesium.createOsmBuildingsAsync();
-    viewer.scene.primitives.add(buildingTileset);   
+    viewer.scene.primitives.add(buildingTileset);
+    
+    // Parse CDM data from Django context
+    const cdmsData = {{ cdms_json|safe }};
+    const km2m = 1000; // Convert kilometers to meters
+    const colors = [Cesium.Color.RED, Cesium.Color.BLUE, Cesium.Color.GREEN, Cesium.Color.YELLOW, Cesium.Color.PURPLE];
+    
+    // Add satellites from CDM database
+    let colorIndex = 0;
+    cdmsData.forEach((cdm, index) => {
+      // Add Object 1 satellite
+      if (cdm.obj1_x !== null && cdm.obj1_y !== null && cdm.obj1_z !== null) {
+        const pos1 = new Cesium.Cartesian3(
+          cdm.obj1_x * km2m,
+          cdm.obj1_y * km2m,
+          cdm.obj1_z * km2m
+        );
+        const color1 = colors[colorIndex % colors.length];
+        viewer.entities.add({
+          name: cdm.obj1_name,
+          position: pos1,
+          point: {
+            pixelSize: 10,
+            color: color1,
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2,
+          },
+          label: {
+            text: cdm.obj1_name,
+            font: '12pt monospace',
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -15),
+          }
+        });
+      }
+      
+      // Add Object 2 satellite
+      if (cdm.obj2_x !== null && cdm.obj2_y !== null && cdm.obj2_z !== null) {
+        const pos2 = new Cesium.Cartesian3(
+          cdm.obj2_x * km2m,
+          cdm.obj2_y * km2m,
+          cdm.obj2_z * km2m
+        );
+        const color2 = colors[(colorIndex + 1) % colors.length];
+        viewer.entities.add({
+          name: cdm.obj2_name,
+          position: pos2,
+          point: {
+            pixelSize: 10,
+            color: color2,
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2,
+          },
+          label: {
+            text: cdm.obj2_name,
+            font: '12pt monospace',
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 2,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -15),
+          }
+        });
+      }
+      colorIndex += 2;
+    });   
   </script>
 </body>
 </html>

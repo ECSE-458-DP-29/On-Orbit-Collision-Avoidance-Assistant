@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% load formatting %}
+
+{% block title %}View CDM - {{ cdm_id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">CDM Details: {{ cdm_id }}</h1>
+            
+            <!-- Back button -->
+            <div class="mb-3">
+                <a href="{% url 'manage-cdms' %}" class="btn btn-secondary">← Back to CDM Manager</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main CDM Information -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Conjunction Data Message Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>CDM ID:</strong>
+                                <p>{{ cdm.cdm_id }}</p>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Creation Date:</strong>
+                                <p>{{ cdm.creation_date|date:"Y-m-d H:i:s" }}</p>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Time of Closest Approach:</strong>
+                                <p>{{ cdm.tca|date:"Y-m-d H:i:s" }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Collision Probability:</strong>
+                                <p>
+                                    {% if cdm.collision_probability %}
+                                        <span class="badge {% if cdm.collision_probability > 0.01 %}bg-danger{% elif cdm.collision_probability > 0.001 %}bg-warning{% else %}bg-success{% endif %}">
+                                            {{ cdm.collision_probability|sci_notation:5 }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">N/A</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Hard Body Radius (m):</strong>
+                                <p>{{ cdm.hard_body_radius|floatformat:2 }}</p>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Miss Distance (m):</strong>
+                                <p>{{ cdm.miss_distance_m|floatformat:2 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Object Information -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Object 1</h5>
+                </div>
+                <div class="card-body">
+                    {% if obj1 %}
+                        <div class="mb-3">
+                            <strong>Object Designator:</strong>
+                            <p>{{ obj1.object_designator }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Object Name:</strong>
+                            <p>{{ obj1.object_name|default:"N/A" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Object Type:</strong>
+                            <p>{{ obj1.object_type|default:"N/A" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Operator Organization:</strong>
+                            <p>{{ obj1.operator_organization|default:"N/A" }}</p>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No object 1 associated</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Object 2</h5>
+                </div>
+                <div class="card-body">
+                    {% if obj2 %}
+                        <div class="mb-3">
+                            <strong>Object Designator:</strong>
+                            <p>{{ obj2.object_designator }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Object Name:</strong>
+                            <p>{{ obj2.object_name|default:"N/A" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Object Type:</strong>
+                            <p>{{ obj2.object_type|default:"N/A" }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Operator Organization:</strong>
+                            <p>{{ obj2.operator_organization|default:"N/A" }}</p>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No object 2 associated</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Relative Motion Information -->
+    {% if cdm.relative_speed_ms or cdm.relative_position %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Relative Motion Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Relative Speed (m/s):</strong>
+                                <p>
+                                    {% if cdm.relative_speed_ms %}
+                                        {{ cdm.relative_speed_ms|floatformat:2 }} m/s
+                                    {% else %}
+                                        <span class="text-muted">Not available</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Relative Position (RTN):</strong>
+                                <p>
+                                    {% if cdm.relative_position %}
+                                        Radial: {{ cdm.relative_position.r|default:"N/A"|floatformat:2 }} m<br>
+                                        Tangential: {{ cdm.relative_position.t|default:"N/A"|floatformat:2 }} m<br>
+                                        Normal: {{ cdm.relative_position.n|default:"N/A"|floatformat:2 }} m
+                                    {% else %}
+                                        <span class="text-muted">Not available</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- State Vectors -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Object 1 State Vector (ECI)</h5>
+                </div>
+                <div class="card-body">
+                    {% if cdm.obj1_position_x or cdm.obj1_velocity_x %}
+                        <div class="mb-2">
+                            <strong>Position (m):</strong><br>
+                            X: {{ cdm.obj1_position_x|floatformat:2|default:"N/A" }}<br>
+                            Y: {{ cdm.obj1_position_y|floatformat:2|default:"N/A" }}<br>
+                            Z: {{ cdm.obj1_position_z|floatformat:2|default:"N/A" }}
+                        </div>
+                        <div class="mb-2">
+                            <strong>Velocity (m/s):</strong><br>
+                            Vx: {{ cdm.obj1_velocity_x|floatformat:2|default:"N/A" }}<br>
+                            Vy: {{ cdm.obj1_velocity_y|floatformat:2|default:"N/A" }}<br>
+                            Vz: {{ cdm.obj1_velocity_z|floatformat:2|default:"N/A" }}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No state vector data</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Object 2 State Vector (ECI)</h5>
+                </div>
+                <div class="card-body">
+                    {% if cdm.obj2_position_x or cdm.obj2_velocity_x %}
+                        <div class="mb-2">
+                            <strong>Position (m):</strong><br>
+                            X: {{ cdm.obj2_position_x|floatformat:2|default:"N/A" }}<br>
+                            Y: {{ cdm.obj2_position_y|floatformat:2|default:"N/A" }}<br>
+                            Z: {{ cdm.obj2_position_z|floatformat:2|default:"N/A" }}
+                        </div>
+                        <div class="mb-2">
+                            <strong>Velocity (m/s):</strong><br>
+                            Vx: {{ cdm.obj2_velocity_x|floatformat:2|default:"N/A" }}<br>
+                            Vy: {{ cdm.obj2_velocity_y|floatformat:2|default:"N/A" }}<br>
+                            Vz: {{ cdm.obj2_velocity_z|floatformat:2|default:"N/A" }}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No state vector data</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Covariance Matrices -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Object 1 Covariance Matrix</h5>
+                </div>
+                <div class="card-body">
+                    {% if cdm.obj1_covariance_matrix %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <tbody>
+                                    {% for row in cdm.obj1_covariance_matrix %}
+                                        <tr>
+                                            {% for value in row %}
+                                                <td>{{ value|floatformat:6 }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No covariance matrix data</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Object 2 Covariance Matrix</h5>
+                </div>
+                <div class="card-body">
+                    {% if cdm.obj2_covariance_matrix %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <tbody>
+                                    {% for row in cdm.obj2_covariance_matrix %}
+                                        <tr>
+                                            {% for value in row %}
+                                                <td>{{ value|floatformat:6 }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No covariance matrix data</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Information -->
+    {% if event %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Associated Event</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Event ID:</strong>
+                                <p>{{ event.id }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Representative TCA:</strong>
+                                <p>{{ event.representative_tca|date:"Y-m-d H:i:s" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Object 1:</strong>
+                                <p>{{ event.obj1.object_designator }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <strong>Object 2:</strong>
+                                <p>{{ event.obj2.object_designator }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Action Buttons -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <a href="{% url 'manage-cdms' %}" class="btn btn-secondary">← Back to CDM Manager</a>
+                    <a href="{% url 'cdm-calculate-pc' cdm.id %}" class="btn btn-primary" onclick="return confirm('Calculate Pc for this CDM?');">📊 Calculate Probability of Collision</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card-header {
+        font-weight: 500;
+        padding: 1rem;
+    }
+    
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    strong {
+        color: #333;
+        font-weight: 600;
+    }
+    
+    .badge {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    .table-responsive {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}

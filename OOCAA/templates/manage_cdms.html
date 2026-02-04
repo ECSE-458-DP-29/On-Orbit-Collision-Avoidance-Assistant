@@ -56,6 +56,17 @@
                         >
                     </div>
                     <div class="col-md-3">
+                        <label for="eventId" class="form-label">Event ID</label>
+                        <input 
+                            type="number" 
+                            class="form-control" 
+                            id="eventId" 
+                            name="event_id" 
+                            placeholder="Event ID"
+                            value="{{ filters.event_id|default:'' }}"
+                        >
+                    </div>
+                    <div class="col-md-3">
                         <label for="pcMin" class="form-label">Pc Min</label>
                         <input 
                             type="number" 
@@ -91,6 +102,8 @@
                             <option value="-collision_probability" {% if filters.sort_by == "-collision_probability" %}selected{% endif %}>Highest Pc</option>
                             <option value="collision_probability" {% if filters.sort_by == "collision_probability" %}selected{% endif %}>Lowest Pc</option>
                             <option value="cdm_id" {% if filters.sort_by == "cdm_id" %}selected{% endif %}>CDM ID (A-Z)</option>
+                            <option value="event_id" {% if filters.sort_by == "event_id" %}selected{% endif %}>Event ID</option>
+                            <option value="-event_id" {% if filters.sort_by == "-event_id" %}selected{% endif %}>Event ID (Reverse)</option>
                         </select>
                     </div>
                     <div class="col-12 d-flex gap-2">
@@ -118,6 +131,7 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>CDM ID</th>
+                                <th>Event ID</th>
                                 <th>Object 1</th>
                                 <th>Object 2</th>
                                 <th>Creation Date</th>
@@ -132,6 +146,13 @@
                             {% for cdm in cdms %}
                             <tr>
                                 <td><strong>{{ cdm.cdm_id }}</strong></td>
+                                <td>
+                                    {% if cdm.event %}
+                                        <span class="badge bg-info">{{ cdm.event.id }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <a href="/spaceobjects/{{ cdm.obj1.id }}/">
                                         {{ cdm.obj1.object_designator }}
