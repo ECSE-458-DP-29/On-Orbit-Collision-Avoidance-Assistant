@@ -47,9 +47,37 @@ def home(request):
 
 
 def globe(request):
-    """Render the 3D globe viewer page with satellite data from CDM."""
-    # Fetch all CDMs with related SpaceObjects
-    cdms = CDM.objects.all().select_related('obj1', 'obj2')
+    """Render the 3D globe viewer page with satellite data from CDM.
+    
+    If multiple events exist, displays only the CDM with the latest creation_date for each event.
+    """
+    from django.db.models import Max
+    
+    # Group CDMs by event and get only the latest one for each event
+    # First, get all events that have CDMs
+    events_with_cdms = CDM.objects.filter(
+        event__isnull=False
+    ).values('event_id').annotate(
+        latest_creation_date=Max('creation_date')
+    )
+    
+    # Collect CDMs: latest from each event + CDMs without events
+    cdms = CDM.objects.filter(event__isnull=True)  # CDMs without events
+    
+    for event_info in events_with_cdms:
+        event_id = event_info['event_id']
+        latest_date = event_info['latest_creation_date']
+        # Get the CDM with latest creation_date for this event
+        latest_cdm = CDM.objects.filter(
+            event_id=event_id,
+            creation_date=latest_date
+        ).select_related('obj1', 'obj2').first()
+        if latest_cdm:
+            cdms = cdms | CDM.objects.filter(pk=latest_cdm.pk)
+    
+    # Ensure we have related objects
+    cdms = cdms.select_related('obj1', 'obj2')
+    
     # Serialize CDM data to JSON for JavaScript
     cdm_data = []
     for cdm in cdms:
@@ -138,7 +166,8 @@ def manage_cdms(request):
         'event_id': request.GET.get('event_id', ''),
         'pc_min': request.GET.get('pc_min', ''),
         'pc_max': request.GET.get('pc_max', ''),
-        'sort_by': request.GET.get('sort_by', '-creation_date'),
+        'sort_field': request.GET.get('sort_field', 'creation_date'),
+        'sort_order': request.GET.get('sort_order', 'desc'),
     }
     
     # Apply filters
@@ -173,11 +202,30 @@ def manage_cdms(request):
             pass
     
     # Apply sorting
-    sort_by = filters['sort_by']
-    if sort_by in ['-creation_date', 'creation_date', '-collision_probability', 'collision_probability', 'cdm_id', 'event_id', '-event_id']:
-        cdms = cdms.order_by(sort_by)
+    # Define allowed fields for sorting
+    allowed_sort_fields = [
+        'creation_date', 'tca', 'collision_probability',
+        'miss_distance_m', 'cdm_id', 'event_id', 'obj1_id', 'obj2_id'
+    ]
+    
+    sort_field = filters['sort_field']
+    sort_order = filters['sort_order']
+    
+    # Validate sort_field
+    if sort_field not in allowed_sort_fields:
+        sort_field = 'creation_date'
+    
+    # Validate sort_order
+    if sort_order not in ['asc', 'desc']:
+        sort_order = 'desc'
+    
+    # Build the order_by parameter
+    if sort_order == 'asc':
+        order_by_field = sort_field
     else:
-        cdms = cdms.order_by('-creation_date')
+        order_by_field = f'-{sort_field}'
+    
+    cdms = cdms.order_by(order_by_field)
     
     # Pagination
     paginator = Paginator(cdms, 25)  # 25 CDMs per page
@@ -318,6 +366,12 @@ class CDMListCreateView(APIView):
         if 'min_collision_probability' in request.query_params:
             filters['min_collision_probability'] = request.query_params['min_collision_probability']
         
+        if 'sort_field' in request.query_params:
+            filters['sort_field'] = request.query_params['sort_field']
+        
+        if 'sort_order' in request.query_params:
+            filters['sort_order'] = request.query_params['sort_order']
+        
         cdms = list_cdms(filters if filters else None)
         serializer = CDMSerializer(cdms, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -442,6 +496,12 @@ class EventListView(APIView):
                     {"detail": "min_cdm_count must be an integer."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+        
+        if 'sort_field' in request.query_params:
+            filters['sort_field'] = request.query_params['sort_field']
+        
+        if 'sort_order' in request.query_params:
+            filters['sort_order'] = request.query_params['sort_order']
         
         events = list_events(filters if filters else None)
         serializer = EventSerializer(events, many=True)

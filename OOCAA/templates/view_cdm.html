@@ -38,6 +38,26 @@
                                 <strong>Time of Closest Approach:</strong>
                                 <p>{{ cdm.tca|date:"Y-m-d H:i:s" }}</p>
                             </div>
+                            <div class="mb-3">
+                                <strong>Object 1 Covariance RSSE (m):</strong>
+                                <p>
+                                    {% if cdm.get_obj1_covariance_rsse %}
+                                        {{ cdm.get_obj1_covariance_rsse|floatformat:4 }}
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Object 2 Covariance RSSE (m):</strong>
+                                <p>
+                                    {% if cdm.get_obj2_covariance_rsse %}
+                                        {{ cdm.get_obj2_covariance_rsse|floatformat:4 }}
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </p>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -51,10 +71,6 @@
                                         <span class="badge bg-secondary">N/A</span>
                                     {% endif %}
                                 </p>
-                            </div>
-                            <div class="mb-3">
-                                <strong>Hard Body Radius (m):</strong>
-                                <p>{{ cdm.hard_body_radius|floatformat:2 }}</p>
                             </div>
                             <div class="mb-3">
                                 <strong>Miss Distance (m):</strong>

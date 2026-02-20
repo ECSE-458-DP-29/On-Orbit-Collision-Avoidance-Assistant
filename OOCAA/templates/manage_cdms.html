@@ -94,18 +94,7 @@
                             value="{{ filters.pc_max|default:'' }}"
                         >
                     </div>
-                    <div class="col-md-3">
-                        <label for="sortBy" class="form-label">Sort By</label>
-                        <select class="form-select" id="sortBy" name="sort_by">
-                            <option value="-creation_date" {% if filters.sort_by == "-creation_date" %}selected{% endif %}>Newest First</option>
-                            <option value="creation_date" {% if filters.sort_by == "creation_date" %}selected{% endif %}>Oldest First</option>
-                            <option value="-collision_probability" {% if filters.sort_by == "-collision_probability" %}selected{% endif %}>Highest Pc</option>
-                            <option value="collision_probability" {% if filters.sort_by == "collision_probability" %}selected{% endif %}>Lowest Pc</option>
-                            <option value="cdm_id" {% if filters.sort_by == "cdm_id" %}selected{% endif %}>CDM ID (A-Z)</option>
-                            <option value="event_id" {% if filters.sort_by == "event_id" %}selected{% endif %}>Event ID</option>
-                            <option value="-event_id" {% if filters.sort_by == "-event_id" %}selected{% endif %}>Event ID (Reverse)</option>
-                        </select>
-                    </div>
+
                     <div class="col-12 d-flex gap-2">
                         <button type="submit" class="btn btn-primary">Apply Filters</button>
                         <a href="/manage/cdms/" class="btn btn-secondary">Reset</a>
@@ -130,15 +119,114 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th>CDM ID</th>
-                                <th>Event ID</th>
-                                <th>Object 1</th>
-                                <th>Object 2</th>
-                                <th>Creation Date</th>
-                                <th>TCA</th>
-                                <th>Pc</th>
-                                <th>Minimum Distance (km)</th>
-                                <th>Status</th>
+                                <th style="cursor: pointer;">
+                                    CDM ID
+                                    {% if filters.sort_field == "cdm_id" %}
+                                        {% if filters.sort_order == "asc" %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=cdm_id&sort_order=desc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer;"></i></a>
+                                        {% else %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=cdm_id&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-down-left" style="cursor: pointer;"></i></a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=cdm_id&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer; opacity: 0.5;"></i></a>
+                                    {% endif %}
+                                </th>
+                                <th style="cursor: pointer;">
+                                    Event ID
+                                    {% if filters.sort_field == "event_id" %}
+                                        {% if filters.sort_order == "asc" %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=event_id&sort_order=desc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer;"></i></a>
+                                        {% else %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=event_id&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-down-left" style="cursor: pointer;"></i></a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=event_id&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer; opacity: 0.5;"></i></a>
+                                    {% endif %}
+                                </th>
+                                <th style="cursor: pointer;">
+                                    Object 1
+                                    {% if filters.sort_field == "obj1_id" %}
+                                        {% if filters.sort_order == "asc" %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=obj1_id&sort_order=desc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer;"></i></a>
+                                        {% else %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=obj1_id&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-down-left" style="cursor: pointer;"></i></a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=obj1_id&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer; opacity: 0.5;"></i></a>
+                                    {% endif %}
+                                </th>
+                                <th style="cursor: pointer;">
+                                    Object 2
+                                    {% if filters.sort_field == "obj2_id" %}
+                                        {% if filters.sort_order == "asc" %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=obj2_id&sort_order=desc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer;"></i></a>
+                                        {% else %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=obj2_id&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-down-left" style="cursor: pointer;"></i></a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=obj2_id&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer; opacity: 0.5;"></i></a>
+                                    {% endif %}
+                                </th>
+                                <th style="cursor: pointer;">
+                                    Creation Date
+                                    {% if filters.sort_field == "creation_date" %}
+                                        {% if filters.sort_order == "asc" %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=creation_date&sort_order=desc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer;"></i></a>
+                                        {% else %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=creation_date&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-down-left" style="cursor: pointer;"></i></a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=creation_date&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer; opacity: 0.5;"></i></a>
+                                    {% endif %}
+                                </th>
+                                <th style="cursor: pointer;">
+                                    TCA
+                                    {% if filters.sort_field == "tca" %}
+                                        {% if filters.sort_order == "asc" %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=tca&sort_order=desc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer;"></i></a>
+                                        {% else %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=tca&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-down-left" style="cursor: pointer;"></i></a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=tca&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer; opacity: 0.5;"></i></a>
+                                    {% endif %}
+                                </th>
+                                <th style="cursor: pointer;">
+                                    Pc
+                                    {% if filters.sort_field == "collision_probability" %}
+                                        {% if filters.sort_order == "asc" %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=collision_probability&sort_order=desc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer;"></i></a>
+                                        {% else %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=collision_probability&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-down-left" style="cursor: pointer;"></i></a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=collision_probability&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer; opacity: 0.5;"></i></a>
+                                    {% endif %}
+                                </th>
+                                <th style="cursor: pointer;">
+                                    Minimum Distance (km)
+                                    {% if filters.sort_field == "miss_distance_m" %}
+                                        {% if filters.sort_order == "asc" %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=miss_distance_m&sort_order=desc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer;"></i></a>
+                                        {% else %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=miss_distance_m&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-down-left" style="cursor: pointer;"></i></a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=miss_distance_m&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer; opacity: 0.5;"></i></a>
+                                    {% endif %}
+                                </th>
+                                <th style="cursor: pointer;">
+                                    Status
+                                    {% if filters.sort_field == "collision_probability" %}
+                                        {% if filters.sort_order == "asc" %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=collision_probability&sort_order=desc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer;"></i></a>
+                                        {% else %}
+                                            <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=collision_probability&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-down-left" style="cursor: pointer;"></i></a>
+                                        {% endif %}
+                                    {% else %}
+                                        <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&sort_field=collision_probability&sort_order=asc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer; opacity: 0.5;"></i></a>
+                                    {% endif %}
+                                </th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -155,12 +243,12 @@
                                 </td>
                                 <td>
                                     <a href="/spaceobjects/{{ cdm.obj1.id }}/">
-                                        {{ cdm.obj1.object_designator }}
+                                        {{ cdm.obj1.object_name }} ({{ cdm.obj1.object_designator }})
                                     </a>
                                 </td>
                                 <td>
                                     <a href="/spaceobjects/{{ cdm.obj2.id }}/">
-                                        {{ cdm.obj2.object_designator }}
+                                        {{ cdm.obj2.object_name }} ({{ cdm.obj2.object_designator }})
                                     </a>
                                 </td>
                                 <td>
