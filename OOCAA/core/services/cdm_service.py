@@ -88,6 +88,8 @@ def list_cdms(filters: Optional[Dict[str, Any]] = None) -> 'QuerySet[CDM]':
             - tca_after: Filter CDMs with TCA after this datetime
             - tca_before: Filter CDMs with TCA before this datetime
             - min_collision_probability: Filter by minimum collision probability
+            - sort_field: Field to sort by (default: tca)
+            - sort_order: 'asc' or 'desc' (default: desc)
             
     Returns:
         QuerySet of CDM instances
@@ -95,7 +97,7 @@ def list_cdms(filters: Optional[Dict[str, Any]] = None) -> 'QuerySet[CDM]':
     queryset = CDM.objects.select_related('obj1', 'obj2', 'event').all()
     
     if not filters:
-        return queryset
+        return queryset.order_by('-tca')
     
     # Apply filters if provided
     if 'obj1_id' in filters:
@@ -118,7 +120,30 @@ def list_cdms(filters: Optional[Dict[str, Any]] = None) -> 'QuerySet[CDM]':
             collision_probability__gte=filters['min_collision_probability']
         )
     
-    return queryset.order_by('-tca')
+    # Apply sorting
+    allowed_sort_fields = [
+        'creation_date', 'tca', 'collision_probability',
+        'miss_distance_m', 'cdm_id', 'event_id', 'obj1_id', 'obj2_id'
+    ]
+    
+    sort_field = filters.get('sort_field', 'tca')
+    sort_order = filters.get('sort_order', 'desc')
+    
+    # Validate sort_field
+    if sort_field not in allowed_sort_fields:
+        sort_field = 'tca'
+    
+    # Validate sort_order
+    if sort_order not in ['asc', 'desc']:
+        sort_order = 'desc'
+    
+    # Build the order_by parameter
+    if sort_order == 'asc':
+        order_by_field = sort_field
+    else:
+        order_by_field = f'-{sort_field}'
+    
+    return queryset.order_by(order_by_field)
 
 
 @transaction.atomic
@@ -345,6 +370,8 @@ def list_events(filters: Optional[Dict[str, Any]] = None) -> 'QuerySet[Event]':
             - tca_after: Filter events with representative TCA after this datetime
             - tca_before: Filter events with representative TCA before this datetime
             - min_cdm_count: Filter events with at least this many CDMs
+            - sort_field: Field to sort by (default: representative_tca)
+            - sort_order: 'asc' or 'desc' (default: desc)
             
     Returns:
         QuerySet of Event instances
@@ -355,7 +382,7 @@ def list_events(filters: Optional[Dict[str, Any]] = None) -> 'QuerySet[Event]':
     queryset = Event.objects.select_related('obj1', 'obj2').prefetch_related('cdms').all()
     
     if not filters:
-        return queryset
+        return queryset.order_by('-representative_tca')
     
     # Apply filters if provided
     if 'object_id' in filters:
@@ -374,7 +401,29 @@ def list_events(filters: Optional[Dict[str, Any]] = None) -> 'QuerySet[Event]':
             cdm_count__gte=filters['min_cdm_count']
         )
     
-    return queryset.order_by('-representative_tca')
+    # Apply sorting
+    allowed_sort_fields = [
+        'representative_tca', 'id', 'creation_date'
+    ]
+    
+    sort_field = filters.get('sort_field', 'representative_tca')
+    sort_order = filters.get('sort_order', 'desc')
+    
+    # Validate sort_field
+    if sort_field not in allowed_sort_fields:
+        sort_field = 'representative_tca'
+    
+    # Validate sort_order
+    if sort_order not in ['asc', 'desc']:
+        sort_order = 'desc'
+    
+    # Build the order_by parameter
+    if sort_order == 'asc':
+        order_by_field = sort_field
+    else:
+        order_by_field = f'-{sort_field}'
+    
+    return queryset.order_by(order_by_field)
 
 def parse_cdm_json(data: dict) -> CDM:
     """Parse a JSON CDM dictionary and create a CDM object.

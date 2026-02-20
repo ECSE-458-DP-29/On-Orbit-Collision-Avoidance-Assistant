@@ -46,6 +46,105 @@ def home(request):
     return render(request, "home.html")
 
 
+def globe(request):
+    """Render the 3D globe viewer page with satellite data from CDM.
+    
+    If multiple events exist, displays only the CDM with the latest creation_date for each event.
+    If obj_id parameter is provided, filters CDMs to show only those containing that object.
+    """
+    from django.db.models import Max, Q
+    
+    # Get optional object_id parameter to filter for a specific object
+    obj_id = request.GET.get('obj_id', None)
+    
+    # Group CDMs by event and get only the latest one for each event
+    # Also filter by object if specified
+    queryset = CDM.objects.filter(event__isnull=False)
+    
+    if obj_id:
+        try:
+            obj_id = int(obj_id)
+            # Filter CDMs that include this object (either obj1 or obj2)
+            queryset = queryset.filter(Q(obj1_id=obj_id) | Q(obj2_id=obj_id))
+        except ValueError:
+            pass
+    
+    # Get CDMs grouped by event with latest creation_date
+    events_with_cdms = queryset.values('event_id').annotate(
+        latest_creation_date=Max('creation_date')
+    )
+    
+    # Collect CDMs: latest from each event + CDMs without events
+    cdms = CDM.objects.filter(event__isnull=True)  # CDMs without events
+    
+    if obj_id:
+        try:
+            obj_id = int(obj_id)
+            # Also filter CDMs without events by object
+            cdms = cdms.filter(Q(obj1_id=obj_id) | Q(obj2_id=obj_id))
+        except ValueError:
+            pass
+    
+    for event_info in events_with_cdms:
+        event_id = event_info['event_id']
+        latest_date = event_info['latest_creation_date']
+        # Get the CDM with latest creation_date for this event
+        latest_cdm = CDM.objects.filter(
+            event_id=event_id,
+            creation_date=latest_date
+        ).select_related('obj1', 'obj2').first()
+        if latest_cdm:
+            cdms = cdms | CDM.objects.filter(pk=latest_cdm.pk)
+    
+    # Ensure we have related objects
+    cdms = cdms.select_related('obj1', 'obj2')
+    
+    # Serialize CDM data to JSON for JavaScript
+    cdm_data = []
+    for cdm in cdms:
+        cdm_data.append({
+            'cdm_id': cdm.cdm_id,
+            'obj1_name': cdm.obj1.object_name if cdm.obj1 else 'Unknown',
+            'obj1_id': cdm.obj1.id if cdm.obj1 else None,
+            'obj1_x': cdm.obj1_position_x,
+            'obj1_y': cdm.obj1_position_y,
+            'obj1_z': cdm.obj1_position_z,
+            'obj2_name': cdm.obj2.object_name if cdm.obj2 else 'Unknown',
+            'obj2_id': cdm.obj2.id if cdm.obj2 else None,
+            'obj2_x': cdm.obj2_position_x,
+            'obj2_y': cdm.obj2_position_y,
+            'obj2_z': cdm.obj2_position_z,
+            'miss_distance_m': cdm.miss_distance_m,
+            'collision_probability': float(cdm.collision_probability) if cdm.collision_probability else None,
+        })
+    context = {'cdms_json': json.dumps(cdm_data), 'selected_obj_id': obj_id}
+    return render(request, "globe.html", context)
+
+
+@login_required(login_url='/login/')
+def view_cdm(request, pk):
+    """Display detailed view of a specific CDM.
+    
+    GET: Display all attributes of a CDM
+    """
+    try:
+        cdm = CDM.objects.get(pk=pk)
+    except CDM.DoesNotExist:
+        messages.error(request, "CDM not found.")
+        return redirect('manage-cdms')
+    
+    # Get all CDM attributes
+    context = {
+        'cdm': cdm,
+        'cdm_id': cdm.cdm_id,
+        'obj1': cdm.obj1,
+        'obj2': cdm.obj2,
+        'event': cdm.event,
+    }
+    
+    return render(request, 'view_cdm.html', context)
+
+
 class CustomLogoutView(View):
     """Custom logout view that handles both GET and POST requests."""
     def get(self, request):
@@ -87,15 +186,30 @@ def manage_cdms(request):
     
     # Build filter parameters for display
     filters = {
+        'simple_search': request.GET.get('simple_search', ''),
         'cdm_id': request.GET.get('cdm_id', ''),
         'obj1_id': request.GET.get('obj1_id', ''),
         'obj2_id': request.GET.get('obj2_id', ''),
+        'event_id': request.GET.get('event_id', ''),
         'pc_min': request.GET.get('pc_min', ''),
         'pc_max': request.GET.get('pc_max', ''),
-        'sort_by': request.GET.get('sort_by', '-creation_date'),
+        'sort_field': request.GET.get('sort_field', 'creation_date'),
+        'sort_order': request.GET.get('sort_order', 'desc'),
     }
     
-    # Apply filters
+    # Apply simple search first (searches CDM ID, Object Designators, and Object Names)
+    if filters['simple_search']:
+        search_term = filters['simple_search']
+        from django.db.models import Q
+        cdms = cdms.filter(
+            Q(cdm_id__icontains=search_term) | 
+            Q(obj1__object_designator__icontains=search_term) | 
+            Q(obj2__object_designator__icontains=search_term) |
+            Q(obj1__object_name__icontains=search_term) |
+            Q(obj2__object_name__icontains=search_term)
+        )
+    
+    # Apply advanced filters
     if filters['cdm_id']:
         cdms = cdms.filter(cdm_id__icontains=filters['cdm_id'])
     
@@ -104,6 +218,13 @@ def manage_cdms(request):
     
     if filters['obj2_id']:
         cdms = cdms.filter(obj2__object_designator__icontains=filters['obj2_id'])
+    
+    if filters['event_id']:
+        try:
+            event_id = int(filters['event_id'])
+            cdms = cdms.filter(event_id=event_id)
+        except ValueError:
+            pass
     
     if filters['pc_min']:
         try:
@@ -120,11 +241,30 @@ def manage_cdms(request):
             pass
     
     # Apply sorting
-    sort_by = filters['sort_by']
-    if sort_by in ['-creation_date', 'creation_date', '-collision_probability', 'collision_probability', 'cdm_id']:
-        cdms = cdms.order_by(sort_by)
+    # Define allowed fields for sorting
+    allowed_sort_fields = [
+        'creation_date', 'tca', 'collision_probability',
+        'miss_distance_m', 'cdm_id', 'event_id', 'obj1_id', 'obj2_id'
+    ]
+    
+    sort_field = filters['sort_field']
+    sort_order = filters['sort_order']
+    
+    # Validate sort_field
+    if sort_field not in allowed_sort_fields:
+        sort_field = 'creation_date'
+    
+    # Validate sort_order
+    if sort_order not in ['asc', 'desc']:
+        sort_order = 'desc'
+    
+    # Build the order_by parameter
+    if sort_order == 'asc':
+        order_by_field = sort_field
     else:
-        cdms = cdms.order_by('-creation_date')
+        order_by_field = f'-{sort_field}'
+    
+    cdms = cdms.order_by(order_by_field)
     
     # Pagination
     paginator = Paginator(cdms, 25)  # 25 CDMs per page
@@ -265,6 +405,12 @@ class CDMListCreateView(APIView):
         if 'min_collision_probability' in request.query_params:
             filters['min_collision_probability'] = request.query_params['min_collision_probability']
         
+        if 'sort_field' in request.query_params:
+            filters['sort_field'] = request.query_params['sort_field']
+        
+        if 'sort_order' in request.query_params:
+            filters['sort_order'] = request.query_params['sort_order']
+        
         cdms = list_cdms(filters if filters else None)
         serializer = CDMSerializer(cdms, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -389,6 +535,12 @@ class EventListView(APIView):
                     {"detail": "min_cdm_count must be an integer."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+        
+        if 'sort_field' in request.query_params:
+            filters['sort_field'] = request.query_params['sort_field']
+        
+        if 'sort_order' in request.query_params:
+            filters['sort_order'] = request.query_params['sort_order']
         
         events = list_events(filters if filters else None)
         serializer = EventSerializer(events, many=True)
@@ -601,6 +753,8 @@ class ParseCDMJsonView(APIView):
     
 __all__ = [
     "home",
+    "globe",
+    "view_cdm",
     "CustomLogoutView",
     "api_index",
     "manage_cdms",

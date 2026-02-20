@@ -141,5 +141,40 @@ class CDM(models.Model):
         help_text="Combined hard body radius (meters)"
     )
 
+    def calculate_covariance_rsse(self, covariance_matrix):
+        """Calculate Root Sum Squared Error of a covariance matrix.
+        
+        RSSE = sqrt(sum of squared diagonal elements)
+        This represents the combined uncertainty from all 6 dimensions.
+        
+        Args:
+            covariance_matrix: 6x6 or 3x3 nested array (JSON)
+            
+        Returns:
+            float: RSSE value, or None if matrix is invalid
+        """
+        if not covariance_matrix:
+            return None
+        
+        try:
+            # Sum the diagonal elements squared
+            rsse_squared = 0
+            for i in range(len(covariance_matrix)):
+                if i < len(covariance_matrix[i]):
+                    rsse_squared += covariance_matrix[i][i] ** 2
+            
+            # Return square root
+            return rsse_squared ** 0.5
+        except (TypeError, IndexError, ValueError):
+            return None
+    
+    def get_obj1_covariance_rsse(self):
+        """Get RSSE for Object 1 covariance matrix."""
+        return self.calculate_covariance_rsse(self.obj1_covariance_matrix)
+    
+    def get_obj2_covariance_rsse(self):
+        """Get RSSE for Object 2 covariance matrix."""
+        return self.calculate_covariance_rsse(self.obj2_covariance_matrix)
+
     def __str__(self):
         return f"CDM {self.cdm_id} @ {self.tca}"
