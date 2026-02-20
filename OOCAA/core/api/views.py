@@ -50,19 +50,40 @@ def globe(request):
     """Render the 3D globe viewer page with satellite data from CDM.
     
     If multiple events exist, displays only the CDM with the latest creation_date for each event.
+    If obj_id parameter is provided, filters CDMs to show only those containing that object.
     """
-    from django.db.models import Max
+    from django.db.models import Max, Q
+    
+    # Get optional object_id parameter to filter for a specific object
+    obj_id = request.GET.get('obj_id', None)
     
     # Group CDMs by event and get only the latest one for each event
-    # First, get all events that have CDMs
-    events_with_cdms = CDM.objects.filter(
-        event__isnull=False
-    ).values('event_id').annotate(
+    # Also filter by object if specified
+    queryset = CDM.objects.filter(event__isnull=False)
+    
+    if obj_id:
+        try:
+            obj_id = int(obj_id)
+            # Filter CDMs that include this object (either obj1 or obj2)
+            queryset = queryset.filter(Q(obj1_id=obj_id) | Q(obj2_id=obj_id))
+        except ValueError:
+            pass
+    
+    # Get CDMs grouped by event with latest creation_date
+    events_with_cdms = queryset.values('event_id').annotate(
         latest_creation_date=Max('creation_date')
     )
     
     # Collect CDMs: latest from each event + CDMs without events
     cdms = CDM.objects.filter(event__isnull=True)  # CDMs without events
+    
+    if obj_id:
+        try:
+            obj_id = int(obj_id)
+            # Also filter CDMs without events by object
+            cdms = cdms.filter(Q(obj1_id=obj_id) | Q(obj2_id=obj_id))
+        except ValueError:
+            pass
     
     for event_info in events_with_cdms:
         event_id = event_info['event_id']
@@ -82,16 +103,21 @@ def globe(request):
     cdm_data = []
     for cdm in cdms:
         cdm_data.append({
+            'cdm_id': cdm.cdm_id,
             'obj1_name': cdm.obj1.object_name if cdm.obj1 else 'Unknown',
+            'obj1_id': cdm.obj1.id if cdm.obj1 else None,
             'obj1_x': cdm.obj1_position_x,
             'obj1_y': cdm.obj1_position_y,
             'obj1_z': cdm.obj1_position_z,
             'obj2_name': cdm.obj2.object_name if cdm.obj2 else 'Unknown',
+            'obj2_id': cdm.obj2.id if cdm.obj2 else None,
             'obj2_x': cdm.obj2_position_x,
             'obj2_y': cdm.obj2_position_y,
             'obj2_z': cdm.obj2_position_z,
+            'miss_distance_m': cdm.miss_distance_m,
+            'collision_probability': float(cdm.collision_probability) if cdm.collision_probability else None,
         })
-    context = {'cdms_json': json.dumps(cdm_data)}
+    context = {'cdms_json': json.dumps(cdm_data), 'selected_obj_id': obj_id}
     return render(request, "globe.html", context)
 
 
@@ -160,6 +186,7 @@ def manage_cdms(request):
     
     # Build filter parameters for display
     filters = {
+        'simple_search': request.GET.get('simple_search', ''),
         'cdm_id': request.GET.get('cdm_id', ''),
         'obj1_id': request.GET.get('obj1_id', ''),
         'obj2_id': request.GET.get('obj2_id', ''),
@@ -170,7 +197,19 @@ def manage_cdms(request):
         'sort_order': request.GET.get('sort_order', 'desc'),
     }
     
-    # Apply filters
+    # Apply simple search first (searches CDM ID, Object Designators, and Object Names)
+    if filters['simple_search']:
+        search_term = filters['simple_search']
+        from django.db.models import Q
+        cdms = cdms.filter(
+            Q(cdm_id__icontains=search_term) | 
+            Q(obj1__object_designator__icontains=search_term) | 
+            Q(obj2__object_designator__icontains=search_term) |
+            Q(obj1__object_name__icontains=search_term) |
+            Q(obj2__object_name__icontains=search_term)
+        )
+    
+    # Apply advanced filters
     if filters['cdm_id']:
         cdms = cdms.filter(cdm_id__icontains=filters['cdm_id'])
     

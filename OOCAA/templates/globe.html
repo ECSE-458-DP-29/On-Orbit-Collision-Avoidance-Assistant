@@ -1,111 +1,140 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <!-- Include the CesiumJS JavaScript and CSS files -->
-  <script src="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Cesium.js"></script>
-  <link href="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
-  <style>
-    html, body, #cesiumContainer {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
+{% extends "base.html" %}
+
+{% block title %}3D Globe - OOCAA{% endblock %}
+
+{% block content %}
+<div id="cesiumContainer" style="width: 100%; height: calc(100vh - 70px); margin: 0; padding: 0; overflow: hidden;"></div>
+
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+<script type="module">
+  // Your access token can be found at: https://ion.cesium.com/tokens.
+  // This is the default access token from your ion account
+
+  Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4NWI5MzFlMS1iZjJkLTQ5MDMtODdlYi1lY2M2MzI3ZGNiZGQiLCJpZCI6Mzg1OTYyLCJpYXQiOjE3NzAwMDE1NTR9.0mbwwwFBq4sI_cCbqWj6qduEE4QYV9OMMd3QBci-Bc8';
+
+  // Initialize the Cesium Viewer in the HTML element with the `cesiumContainer` ID.
+  const viewer = new Cesium.Viewer('cesiumContainer', {
+    terrain: Cesium.Terrain.fromWorldTerrain(),
+  });    
+
+  // Fly the camera to view the entire globe.
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(0, 0, 50000000),
+    orientation: {
+      heading: Cesium.Math.toRadians(0.0),
+      pitch: Cesium.Math.toRadians(-90.0),
     }
-  </style>
-</head>
-<body>
-  <div id="cesiumContainer"></div>
-  <script type="module">
-    // Your access token can be found at: https://ion.cesium.com/tokens.
-    // This is the default access token from your ion account
+  });
 
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4NWI5MzFlMS1iZjJkLTQ5MDMtODdlYi1lY2M2MzI3ZGNiZGQiLCJpZCI6Mzg1OTYyLCJpYXQiOjE3NzAwMDE1NTR9.0mbwwwFBq4sI_cCbqWj6qduEE4QYV9OMMd3QBci-Bc8';
-
-    // Initialize the Cesium Viewer in the HTML element with the `cesiumContainer` ID.
-    const viewer = new Cesium.Viewer('cesiumContainer', {
-      terrain: Cesium.Terrain.fromWorldTerrain(),
-    });    
-
-    // Fly the camera to view the entire globe.
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(0, 0, 50000000),
-      orientation: {
-        heading: Cesium.Math.toRadians(0.0),
-        pitch: Cesium.Math.toRadians(-90.0),
-      }
-    });
-
-    // Add Cesium OSM Buildings, a global 3D buildings layer.
-    const buildingTileset = await Cesium.createOsmBuildingsAsync();
-    viewer.scene.primitives.add(buildingTileset);
-    
-    // Parse CDM data from Django context
-    const cdmsData = {{ cdms_json|safe }};
-    const km2m = 1000; // Convert kilometers to meters
-    const colors = [Cesium.Color.RED, Cesium.Color.BLUE, Cesium.Color.GREEN, Cesium.Color.YELLOW, Cesium.Color.PURPLE];
-    
-    // Add satellites from CDM database
-    let colorIndex = 0;
-    cdmsData.forEach((cdm, index) => {
-      // Add Object 1 satellite
-      if (cdm.obj1_x !== null && cdm.obj1_y !== null && cdm.obj1_z !== null) {
-        const pos1 = new Cesium.Cartesian3(
-          cdm.obj1_x * km2m,
-          cdm.obj1_y * km2m,
-          cdm.obj1_z * km2m
-        );
-        const color1 = colors[colorIndex % colors.length];
-        viewer.entities.add({
-          name: cdm.obj1_name,
-          position: pos1,
-          point: {
-            pixelSize: 10,
-            color: color1,
-            outlineColor: Cesium.Color.WHITE,
-            outlineWidth: 2,
-          },
-          label: {
-            text: cdm.obj1_name,
-            font: '12pt monospace',
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            outlineWidth: 2,
-            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new Cesium.Cartesian2(0, -15),
-          }
-        });
-      }
+  // Add Cesium OSM Buildings, a global 3D buildings layer.
+  const buildingTileset = await Cesium.createOsmBuildingsAsync();
+  viewer.scene.primitives.add(buildingTileset);
+  
+  // Parse CDM data from Django context
+  const cdmsData = {{ cdms_json|safe }};
+  const selectedObjId = {{ selected_obj_id|default:'null' }};
+  const km2m = 1000; // Convert kilometers to meters
+  const colors = [Cesium.Color.RED, Cesium.Color.BLUE, Cesium.Color.GREEN, Cesium.Color.YELLOW, Cesium.Color.PURPLE];
+  
+  // Add satellites from CDM database
+  let colorIndex = 0;
+  cdmsData.forEach((cdm, index) => {
+    // Add Object 1 satellite
+    if (cdm.obj1_x !== null && cdm.obj1_y !== null && cdm.obj1_z !== null) {
+      const pos1 = new Cesium.Cartesian3(
+        cdm.obj1_x * km2m,
+        cdm.obj1_y * km2m,
+        cdm.obj1_z * km2m
+      );
+      const isSelected = selectedObjId !== null && cdm.obj1_id === selectedObjId;
+      const color1 = isSelected ? Cesium.Color.YELLOW : colors[colorIndex % colors.length];
+      const pixelSize = isSelected ? 15 : 10;
       
-      // Add Object 2 satellite
-      if (cdm.obj2_x !== null && cdm.obj2_y !== null && cdm.obj2_z !== null) {
-        const pos2 = new Cesium.Cartesian3(
-          cdm.obj2_x * km2m,
-          cdm.obj2_y * km2m,
-          cdm.obj2_z * km2m
-        );
-        const color2 = colors[(colorIndex + 1) % colors.length];
-        viewer.entities.add({
-          name: cdm.obj2_name,
-          position: pos2,
-          point: {
-            pixelSize: 10,
-            color: color2,
-            outlineColor: Cesium.Color.WHITE,
-            outlineWidth: 2,
-          },
-          label: {
-            text: cdm.obj2_name,
-            font: '12pt monospace',
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            outlineWidth: 2,
-            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new Cesium.Cartesian2(0, -15),
-          }
+      // Create description with CDM info
+      const description1 = `
+        <div style="padding: 10px; font-family: monospace;">
+          <h4>${cdm.obj1_name}</h4>
+          <p><b>Associated Object:</b> ${cdm.obj2_name}</p>
+          <p><b>Miss Distance:</b> ${cdm.miss_distance_m !== null ? cdm.miss_distance_m.toFixed(2) + ' m' : 'N/A'}</p>
+          <p><b>Collision Probability:</b> ${cdm.collision_probability !== null ? cdm.collision_probability.toExponential(5) : 'N/A'}</p>
+          <p><b>CDM ID:</b> ${cdm.cdm_id}</p>
+        </div>
+      `;
+      
+      viewer.entities.add({
+        name: cdm.obj1_name,
+        position: pos1,
+        point: {
+          pixelSize: pixelSize,
+          color: color1,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: isSelected ? 3 : 2,
+        },
+        label: {
+          text: cdm.obj1_name + (isSelected ? ' (SELECTED)' : ''),
+          font: isSelected ? 'bold 14pt monospace' : '12pt monospace',
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          outlineWidth: 2,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -15),
+        },
+        description: new Cesium.CallbackProperty(() => description1, false)
+      });
+    }
+    
+    // Add Object 2 satellite
+    if (cdm.obj2_x !== null && cdm.obj2_y !== null && cdm.obj2_z !== null) {
+      const pos2 = new Cesium.Cartesian3(
+        cdm.obj2_x * km2m,
+        cdm.obj2_y * km2m,
+        cdm.obj2_z * km2m
+      );
+      const isSelected = selectedObjId !== null && cdm.obj2_id === selectedObjId;
+      const color2 = isSelected ? Cesium.Color.YELLOW : colors[(colorIndex + 1) % colors.length];
+      const pixelSize = isSelected ? 15 : 10;
+      
+      // Create description with CDM info
+      const description2 = `
+        <div style="padding: 10px; font-family: monospace;">
+          <h4>${cdm.obj2_name}</h4>
+          <p><b>Associated Object:</b> ${cdm.obj1_name}</p>
+          <p><b>Miss Distance:</b> ${cdm.miss_distance_m !== null ? cdm.miss_distance_m.toFixed(2) + ' m' : 'N/A'}</p>
+          <p><b>Collision Probability:</b> ${cdm.collision_probability !== null ? cdm.collision_probability.toExponential(5) : 'N/A'}</p>
+          <p><b>CDM ID:</b> ${cdm.cdm_id}</p>
+        </div>
+      `;
+      
+      viewer.entities.add({
+        name: cdm.obj2_name,
+        position: pos2,
+        point: {
+          pixelSize: pixelSize,
+          color: color2,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: isSelected ? 3 : 2,
+        },
+        label: {
+          text: cdm.obj2_name + (isSelected ? ' (SELECTED)' : ''),
+          font: isSelected ? 'bold 14pt monospace' : '12pt monospace',
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          outlineWidth: 2,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -15),
+        },
+        description: new Cesium.CallbackProperty(() => description2, false)
+      });
+      
+      // If this object is selected, fly camera to it
+      if (isSelected) {
+        viewer.camera.flyTo({
+          destination: pos2,
+          duration: 2.0
         });
       }
-      colorIndex += 2;
-    });   
-  </script>
-</body>
-</html>
+    }
+    colorIndex += 2;
+  });   
+</script>
+{% endblock %}
