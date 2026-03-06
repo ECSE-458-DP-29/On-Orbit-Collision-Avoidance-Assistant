@@ -161,7 +161,25 @@
     return positions;
   }
   // ─────────────────────────────────────────────────────────────────────────
-  
+
+  // Create a transparent canvas with white text (no rectangular background)
+  function createLabelCanvas(text, isSelected) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const font = isSelected ? 'bold 13pt Arial, sans-serif' : '11pt Arial, sans-serif';
+    ctx.font = font;
+    const w = Math.ceil(ctx.measureText(text).width) + 12;
+    canvas.width  = w;
+    canvas.height = 26;
+    ctx.clearRect(0, 0, w, 26);
+    ctx.font = font; // reset after canvas resize
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur  = 4;
+    ctx.fillStyle = 'white';
+    ctx.fillText(text, 6, 20);
+    return canvas;
+  }
+
   // Add satellites from CDM database
   let colorIndex = 0;
   cdmsData.forEach((cdm, index) => {
@@ -196,13 +214,11 @@
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: isSelected ? 3 : 2,
         },
-        label: {
-          text: cdm.obj1_name + (isSelected ? ' (SELECTED)' : ''),
-          font: isSelected ? 'bold 14pt monospace' : '12pt monospace',
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineWidth: 2,
+        billboard: {
+          image: createLabelCanvas(cdm.obj1_name + (isSelected ? ' (SELECTED)' : ''), isSelected),
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -15),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         description: new Cesium.CallbackProperty(() => description1, false)
       });
@@ -260,13 +276,11 @@
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: isSelected ? 3 : 2,
         },
-        label: {
-          text: cdm.obj2_name + (isSelected ? ' (SELECTED)' : ''),
-          font: isSelected ? 'bold 14pt monospace' : '12pt monospace',
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineWidth: 2,
+        billboard: {
+          image: createLabelCanvas(cdm.obj2_name + (isSelected ? ' (SELECTED)' : ''), isSelected),
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -15),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         description: new Cesium.CallbackProperty(() => description2, false)
       });
