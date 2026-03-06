@@ -37,6 +37,20 @@ class SignupForm(UserCreationForm):
             'placeholder': 'Confirm password'
         })
     
+    def clean_username(self):
+        """Validate that username is unique."""
+        username = self.cleaned_data.get('username')
+        if User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError('A user with that username already exists.')
+        return username
+    
+    def clean_email(self):
+        """Validate that email is unique."""
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError('A user with that email already exists.')
+        return email
+    
     def save(self, commit=True):
         """Save user with Observer role by default."""
         user = super().save(commit=False)

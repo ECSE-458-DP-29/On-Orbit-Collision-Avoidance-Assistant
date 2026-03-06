@@ -51,25 +51,32 @@
                     {% else %}
                     {# Token or backup step #}
                     {% for field in form %}
-                    <div class="mb-3">
-                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                        <input 
-                            type="text" 
-                            class="form-control {% if field.errors %}is-invalid{% endif %}"
-                            id="{{ field.id_for_label }}"
-                            name="{{ field.html_name }}"
-                            {% if field.field.required %}required{% endif %}
-                            autofocus
-                        >
-                        {% if field.errors %}
-                        <div class="invalid-feedback d-block">
-                            {{ field.errors }}
+                        {% if field.field.widget.input_type == 'checkbox' %}
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="{{ field.id_for_label }}" name="{{ field.html_name }}">
+                            <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        </div>
+                        {% else %}
+                        <div class="mb-3">
+                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                            <input 
+                                type="text" 
+                                class="form-control {% if field.errors %}is-invalid{% endif %}"
+                                id="{{ field.id_for_label }}"
+                                name="{{ field.html_name }}"
+                                {% if field.field.required %}required{% endif %}
+                                autofocus
+                            >
+                            {% if field.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ field.errors }}
+                            </div>
+                            {% endif %}
+                            {% if field.help_text %}
+                            <small class="text-muted">{{ field.help_text }}</small>
+                            {% endif %}
                         </div>
                         {% endif %}
-                        {% if field.help_text %}
-                        <small class="text-muted">{{ field.help_text }}</small>
-                        {% endif %}
-                    </div>
                     {% endfor %}
                     {% endif %}
 
@@ -97,7 +104,7 @@
                 <form method="post" class="text-center">
                     {% csrf_token %}
                     {{ wizard.management_form }}
-                    <button class="btn btn-link p-0 small" name="challenge_device" value="backup" type="submit">
+                    <button class="btn btn-link p-0 small" name="wizard_goto_step" value="backup" type="submit">
                         Use a backup token instead
                     </button>
                 </form>
