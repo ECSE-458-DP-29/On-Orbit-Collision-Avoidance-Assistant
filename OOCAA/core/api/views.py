@@ -156,6 +156,27 @@ class CustomLogoutView(View):
         return redirect('home')
 
 
+def signup(request):
+    """Handle user registration. New users get Observer role by default."""
+    from django.contrib.auth import login
+    from core.forms import SignupForm
+    
+    if request.user.is_authenticated:
+        return redirect('home')
+    
+    if request.method == 'POST':
+        form = SignupForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, f'Welcome {user.username}! Your account has been created.')
+            return redirect('home')
+    else:
+        form = SignupForm()
+    
+    return render(request, 'registration/signup.html', {'form': form})
+
+
 @login_required(login_url='/login/')
 def manage_cdms(request):
     """Manage CDMs page with filtering and pagination.

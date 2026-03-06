@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
-from core.api.views import home, CustomLogoutView
+from core.api.views import home, CustomLogoutView, signup
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 urlpatterns = [
@@ -34,4 +34,5 @@ urlpatterns = [
     # Authentication URLs
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', CustomLogoutView.as_view(), name='logout'),
+    path('signup/', signup, name='signup'),
 ]

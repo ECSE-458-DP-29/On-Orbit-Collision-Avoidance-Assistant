@@ -73,14 +73,19 @@
                             {{ user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            {% if user.role == 'admin' or user.is_superuser %}
                             <li><a class="dropdown-item" href="/admin/">Admin Panel</a></li>
                             <li><hr class="dropdown-divider"></li>
+                            {% endif %}
                             <li><a class="dropdown-item" href="/logout/">Logout</a></li>
                         </ul>
                     </li>
                     {% else %}
                     <li class="nav-item">
                         <a class="nav-link" href="/login/">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/signup/">Sign Up</a>
                     </li>
                     {% endif %}
                 </ul>
