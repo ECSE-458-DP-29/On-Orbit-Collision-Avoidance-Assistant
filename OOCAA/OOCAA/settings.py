@@ -41,6 +41,13 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'core',  # Fixed capitalization
+    
+    # Two-Factor Authentication
+    'django_otp',
+    'django_otp.plugins.otp_totp',
+    'django_otp.plugins.otp_static',  # For backup codes
+    'two_factor',
+    'two_factor.plugins.phonenumber',  # Optional: for SMS
 ]
 
 # Custom user model
@@ -52,6 +59,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django_otp.middleware.OTPMiddleware',  # Two-Factor Authentication
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -132,7 +140,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Authentication settings
 LOGIN_REDIRECT_URL = '/'
-LOGIN_URL = '/login/'
+LOGIN_URL = 'two_factor:login'
+TWO_FACTOR_REMEMBER_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days
 
 # Django REST Framework
 REST_FRAMEWORK = {

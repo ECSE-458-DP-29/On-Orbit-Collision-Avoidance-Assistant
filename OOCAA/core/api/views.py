@@ -121,7 +121,7 @@ def globe(request):
     return render(request, "globe.html", context)
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/account/login/')
 def view_cdm(request, pk):
     """Display detailed view of a specific CDM.
     
@@ -177,7 +177,7 @@ def signup(request):
     return render(request, 'registration/signup.html', {'form': form})
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/account/login/')
 def manage_cdms(request):
     """Manage CDMs page with filtering and pagination.
     
@@ -302,7 +302,7 @@ def manage_cdms(request):
     return render(request, 'manage_cdms.html', context)
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/account/login/')
 def upload_cdm(request):
     """Handle CDM file uploads.
     

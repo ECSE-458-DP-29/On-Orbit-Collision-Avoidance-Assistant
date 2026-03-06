@@ -77,12 +77,19 @@
                             <li><a class="dropdown-item" href="/admin/">Admin Panel</a></li>
                             <li><hr class="dropdown-divider"></li>
                             {% endif %}
-                            <li><a class="dropdown-item" href="/logout/">Logout</a></li>
+                            <li><a class="dropdown-item" href="{% url 'two_factor:profile' %}">2FA Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="post" action="{% url 'logout' %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item">Logout</button>
+                                </form>
+                            </li>
                         </ul>
                     </li>
                     {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="/login/">Login</a>
+                        <a class="nav-link" href="{% url 'two_factor:login' %}">Login</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/signup/">Sign Up</a>
