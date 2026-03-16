@@ -1,8 +1,8 @@
 # On-Orbit Collision Avoidance Assistant (OOCAA)
 
-## 🚀 Quick Start Options
+## Quick Start Options
 
-### Option 1: Docker (Recommended - Easiest)
+### Option 1: Docker
 For a containerized setup that works on any environment:
 
 **Windows:**
