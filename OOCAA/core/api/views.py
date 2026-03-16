@@ -872,6 +872,44 @@ class DashboardDataView(APIView):
                     'event_count': item['count']
                 })
         
+        # --- PC Evolution Over Time (by Satellite Pair) ---
+        pc_evolution_data = {}
+        cdms_sorted = cdms.order_by('tca')
+        
+        for cdm in cdms_sorted:
+            if cdm.obj1 and cdm.obj2:
+                # Create a key for the satellite pair
+                pair_key = f"{cdm.obj1.object_designator} vs {cdm.obj2.object_designator}"
+                
+                if pair_key not in pc_evolution_data:
+                    pc_evolution_data[pair_key] = {
+                        'pair': pair_key,
+                        'data_points': []
+                    }
+                
+                pc_evolution_data[pair_key]['data_points'].append({
+                    'tca': cdm.tca.isoformat() if cdm.tca else None,
+                    'pc': float(cdm.collision_probability),
+                    'creation_date': cdm.creation_date.isoformat() if cdm.creation_date else None,
+                })
+        
+        # Convert to list and limit to top 5 satellite pairs by number of observations
+        pc_evolution_list = sorted(
+            pc_evolution_data.values(),
+            key=lambda x: len(x['data_points']),
+            reverse=True
+        )[:5]
+        
+        # --- Risk Distribution (High/Medium/Low) ---
+        risk_distribution = {
+            'High Risk (≥1e-3)': cdms.filter(collision_probability__gte=1e-3).count(),
+            'Medium Risk (1e-5 to 1e-3)': cdms.filter(
+                collision_probability__gte=1e-5,
+                collision_probability__lt=1e-3
+            ).count(),
+            'Low Risk (<1e-5)': cdms.filter(collision_probability__lt=1e-5).count(),
+        }
+        
         # --- Event Statistics ---
         pc_stats = cdms.aggregate(
             avg_pc=Avg('collision_probability'),
@@ -890,6 +928,8 @@ class DashboardDataView(APIView):
         return Response({
             'collision_probability_distribution': pc_bins,
             'events_over_time': timeline_data,
+            'pc_evolution': pc_evolution_list,
+            'risk_distribution': risk_distribution,
             'statistics': {
                 'total_cdms': cdms.count(),
                 'total_events': events.count(),

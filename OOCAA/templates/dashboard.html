@@ -140,7 +140,7 @@
         <!-- Collision Probability Histogram -->
         <div class="col-md-6">
             <div class="chart-container">
-                <h5 class="mb-3">Collision Probability Distribution</h5>
+                <h5 class="mb-3">Collision Probability Distribution (Range-based)</h5>
                 <canvas id="pcHistogram"></canvas>
             </div>
         </div>
@@ -150,6 +150,25 @@
             <div class="chart-container">
                 <h5 class="mb-3">Conjunction Events Over Time</h5>
                 <canvas id="eventsTimeline"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Charts Row -->
+    <div class="row">
+        <!-- PC Evolution Over Time -->
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h5 class="mb-3">PC Evolution Over Time (Top 5 Satellite Pairs)</h5>
+                <canvas id="pcEvolution"></canvas>
+            </div>
+        </div>
+
+        <!-- Risk Distribution Histogram -->
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h5 class="mb-3">Risk Distribution</h5>
+                <canvas id="riskDistribution"></canvas>
             </div>
         </div>
     </div>
@@ -165,6 +184,8 @@
     // Global chart instances
     let pcHistogramChart = null;
     let eventsTimelineChart = null;
+    let pcEvolutionChart = null;
+    let riskDistributionChart = null;
 
     // Fetch dashboard data from API
     async function loadDashboardData() {
@@ -183,6 +204,8 @@
             // Update charts
             updatePcHistogram(data.collision_probability_distribution);
             updateEventTimeline(data.events_over_time);
+            updatePcEvolution(data.pc_evolution);
+            updateRiskDistribution(data.risk_distribution);
             
         } catch (error) {
             console.error('Error loading dashboard data:', error);
@@ -349,6 +372,152 @@
                         title: {
                             display: true,
                             text: 'Date (TCA)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Update PC evolution chart
+    function updatePcEvolution(data) {
+        const ctx = document.getElementById('pcEvolution').getContext('2d');
+        
+        // Destroy previous chart if exists
+        if (pcEvolutionChart) {
+            pcEvolutionChart.destroy();
+        }
+        
+        // Define colors for different satellite pairs
+        const colors = [
+            '#1a3a52', '#dc3545', '#fd7e14', '#28a745', '#0dcaf0'
+        ];
+        
+        const datasets = data.map((pair, index) => {
+            const points = pair.data_points.sort((a, b) => new Date(a.tca) - new Date(b.tca));
+            
+            return {
+                label: pair.pair,
+                data: points.map(p => ({
+                    x: new Date(p.tca).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+                    y: p.pc
+                })),
+                borderColor: colors[index % colors.length],
+                backgroundColor: colors[index % colors.length] + '33',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            };
+        });
+        
+        // Get unique dates across all datasets
+        const allDates = new Set();
+        data.forEach(pair => {
+            pair.data_points.forEach(p => {
+                const date = new Date(p.tca).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                allDates.add(date);
+            });
+        });
+        
+        const labels = Array.from(allDates).sort((a, b) => new Date(a) - new Date(b));
+        
+        pcEvolutionChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 11
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        type: 'logarithmic',
+                        title: {
+                            display: true,
+                            text: 'Collision Probability (log scale)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date (TCA)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Update risk distribution chart
+    function updateRiskDistribution(data) {
+        const ctx = document.getElementById('riskDistribution').getContext('2d');
+        
+        // Destroy previous chart if exists
+        if (riskDistributionChart) {
+            riskDistributionChart.destroy();
+        }
+        
+        const labels = Object.keys(data);
+        const values = Object.values(data);
+        
+        riskDistributionChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Number of CDMs',
+                    data: values,
+                    backgroundColor: [
+                        '#dc3545', // High risk - red
+                        '#fd7e14', // Medium risk - orange
+                        '#28a745'  // Low risk - green
+                    ],
+                    borderColor: [
+                        '#bd2130',
+                        '#cc6600',
+                        '#1e7e34'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        },
+                        title: {
+                            display: true,
+                            text: 'Count'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Risk Category'
                         }
                     }
                 }
