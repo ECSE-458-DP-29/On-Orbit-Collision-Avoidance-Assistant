@@ -1,6 +1,30 @@
 # On-Orbit Collision Avoidance Assistant (OOCAA)
 
-## Setup
+## 🚀 Quick Start Options
+
+### Option 1: Docker (Recommended - Easiest)
+For a containerized setup that works on any environment:
+
+**Windows:**
+```bash
+docker-start.bat
+```
+
+**Linux/Mac:**
+```bash
+bash docker-start.sh
+```
+
+Then open http://localhost:8000
+
+See [DOCKER_SETUP.md](DOCKER_SETUP.md) for more details.
+
+### Option 2: Local Setup (Manual)
+Follow the traditional setup process below.
+
+---
+
+## Setup (Local Installation)
 
 Follow these steps to set up the project on your local machine:
 
