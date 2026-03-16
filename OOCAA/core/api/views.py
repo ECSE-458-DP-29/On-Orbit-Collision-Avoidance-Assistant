@@ -794,6 +794,114 @@ class ParseCDMJsonView(APIView):
         except Exception as e:
             # Handle errors and return a 400 Bad Request response
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@login_required(login_url='/account/login/')
+def dashboard(request):
+    """Render the analytics dashboard page.
+    
+    Displays visualizations for collision probabilities and conjunction events over time.
+    """
+    return render(request, 'dashboard.html')
+
+
+class DashboardDataView(APIView):
+    """API endpoint to retrieve dashboard analytics data.
+    
+    GET: Returns aggregated data for visualizations:
+    - Collision probability distribution (histogram)
+    - Conjunction events over time (timeline)
+    - Event statistics
+    """
+    
+    def get(self, request, *args, **kwargs):
+        """Get dashboard data for visualizations."""
+        from django.db.models import Count, Min, Max, Avg, Q
+        from datetime import datetime, timedelta
+        
+        # Get all CDMs and events
+        cdms = CDM.objects.filter(collision_probability__isnull=False).select_related('obj1', 'obj2', 'event')
+        events = CDM.objects.filter(event__isnull=False).values('event').distinct()
+        
+        # --- Collision Probability Distribution ---
+        # Bin collision probabilities into ranges for histogram
+        pc_bins = {
+            '0-1e-6': 0,
+            '1e-6-1e-5': 0,
+            '1e-5-1e-4': 0,
+            '1e-4-1e-3': 0,
+            '1e-3-1e-2': 0,
+            '1e-2-0.1': 0,
+            '0.1+': 0,
+        }
+        
+        for cdm in cdms:
+            if cdm.collision_probability:
+                pc = float(cdm.collision_probability)
+                if pc < 1e-6:
+                    pc_bins['0-1e-6'] += 1
+                elif pc < 1e-5:
+                    pc_bins['1e-6-1e-5'] += 1
+                elif pc < 1e-4:
+                    pc_bins['1e-5-1e-4'] += 1
+                elif pc < 1e-3:
+                    pc_bins['1e-4-1e-3'] += 1
+                elif pc < 1e-2:
+                    pc_bins['1e-3-1e-2'] += 1
+                elif pc < 0.1:
+                    pc_bins['1e-2-0.1'] += 1
+                else:
+                    pc_bins['0.1+'] += 1
+        
+        # --- Conjunction Events Over Time ---
+        # Group CDMs by TCA date and count events
+        from django.db.models.functions import TruncDate
+        events_over_time = CDM.objects.filter(
+            event__isnull=False
+        ).annotate(
+            tca_date=TruncDate('tca')
+        ).values('tca_date').annotate(
+            count=Count('event', distinct=True)
+        ).order_by('tca_date')
+        
+        timeline_data = []
+        for item in events_over_time:
+            if item['tca_date']:
+                timeline_data.append({
+                    'date': item['tca_date'].isoformat(),
+                    'event_count': item['count']
+                })
+        
+        # --- Event Statistics ---
+        pc_stats = cdms.aggregate(
+            avg_pc=Avg('collision_probability'),
+            min_pc=Min('collision_probability'),
+            max_pc=Max('collision_probability'),
+        )
+        
+        high_risk_count = cdms.filter(collision_probability__gte=1e-3).count()
+        medium_risk_count = cdms.filter(
+            collision_probability__gte=1e-5,
+            collision_probability__lt=1e-3
+        ).count()
+        low_risk_count = cdms.filter(collision_probability__lt=1e-5).count()
+        
+        # Return data for frontend
+        return Response({
+            'collision_probability_distribution': pc_bins,
+            'events_over_time': timeline_data,
+            'statistics': {
+                'total_cdms': cdms.count(),
+                'total_events': events.count(),
+                'avg_collision_probability': float(pc_stats['avg_pc']) if pc_stats['avg_pc'] else None,
+                'min_collision_probability': float(pc_stats['min_pc']) if pc_stats['min_pc'] else None,
+                'max_collision_probability': float(pc_stats['max_pc']) if pc_stats['max_pc'] else None,
+                'high_risk_count': high_risk_count,
+                'medium_risk_count': medium_risk_count,
+                'low_risk_count': low_risk_count,
+            }
+        }, status=status.HTTP_200_OK)
+
     
 __all__ = [
     "home",
@@ -803,6 +911,7 @@ __all__ = [
     "api_index",
     "manage_cdms",
     "upload_cdm",
+    "dashboard",
     "CDMListCreateView",
     "CDMDetailView",
     "SpaceObjectListCreateView",
@@ -810,4 +919,5 @@ __all__ = [
     "CalculatePcView",
     "BatchCalculatePcView",
     "ParseCDMJsonView",
+    "DashboardDataView",
 ]
