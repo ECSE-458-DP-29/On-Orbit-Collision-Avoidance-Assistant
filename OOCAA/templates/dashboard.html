@@ -1,0 +1,371 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - OOCAA{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-container {
+        padding: 20px 0;
+    }
+    .chart-container {
+        position: relative;
+        width: 100%;
+        height: 400px;
+        margin-bottom: 30px;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stats-card {
+        padding: 20px;
+        border-radius: 8px;
+        background-color: #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    .stats-card h5 {
+        color: #1a3a52;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+    .stats-value {
+        font-size: 28px;
+        font-weight: bold;
+        color: #1a3a52;
+    }
+    .stats-label {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .risk-high {
+        color: #dc3545;
+    }
+    .risk-medium {
+        color: #fd7e14;
+    }
+    .risk-low {
+        color: #28a745;
+    }
+    .page-header {
+        margin-bottom: 30px;
+        border-bottom: 2px solid #1a3a52;
+        padding-bottom: 10px;
+    }
+    .page-header h1 {
+        color: #1a3a52;
+        font-weight: 600;
+    }
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+    .error {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Page Header -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="page-header">
+                <h1><i class="bi bi-graph-up"></i> Analytics Dashboard</h1>
+                <p class="text-muted">Visualizations and statistics for conjunction events and collision probabilities</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Row -->
+    <div class="row" id="statsContainer">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-label">Total CDMs</div>
+                <div class="stats-value" id="totalCdms">-</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-label">Total Events</div>
+                <div class="stats-value" id="totalEvents">-</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-label">Max Collision Probability</div>
+                <div class="stats-value" id="maxPc">-</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-label">Average Collision Probability</div>
+                <div class="stats-value" id="avgPc">-</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Risk Distribution Row -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="stats-label">High Risk (≥1e-3)</div>
+                <div class="stats-value risk-high" id="highRisk">-</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="stats-label">Medium Risk (1e-5 to 1e-3)</div>
+                <div class="stats-value risk-medium" id="mediumRisk">-</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="stats-label">Low Risk (&lt;1e-5)</div>
+                <div class="stats-value risk-low" id="lowRisk">-</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <!-- Collision Probability Histogram -->
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h5 class="mb-3">Collision Probability Distribution</h5>
+                <canvas id="pcHistogram"></canvas>
+            </div>
+        </div>
+
+        <!-- Events Over Time Chart -->
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h5 class="mb-3">Conjunction Events Over Time</h5>
+                <canvas id="eventsTimeline"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Message Container -->
+    <div id="errorContainer"></div>
+</div>
+
+<!-- Chart.js Library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+
+<script>
+    // Global chart instances
+    let pcHistogramChart = null;
+    let eventsTimelineChart = null;
+
+    // Fetch dashboard data from API
+    async function loadDashboardData() {
+        try {
+            const response = await fetch('/api/dashboard-data/');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Update statistics
+            updateStatistics(data.statistics);
+            
+            // Update charts
+            updatePcHistogram(data.collision_probability_distribution);
+            updateEventTimeline(data.events_over_time);
+            
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            showError('Failed to load dashboard data: ' + error.message);
+        }
+    }
+
+    // Update statistics display
+    function updateStatistics(stats) {
+        document.getElementById('totalCdms').textContent = stats.total_cdms;
+        document.getElementById('totalEvents').textContent = stats.total_events;
+        
+        // Format collision probabilities
+        const maxPc = stats.max_collision_probability;
+        const avgPc = stats.avg_collision_probability;
+        
+        document.getElementById('maxPc').textContent = maxPc !== null ? formatPc(maxPc) : 'N/A';
+        document.getElementById('avgPc').textContent = avgPc !== null ? formatPc(avgPc) : 'N/A';
+        
+        // Update risk counts
+        document.getElementById('highRisk').textContent = stats.high_risk_count;
+        document.getElementById('mediumRisk').textContent = stats.medium_risk_count;
+        document.getElementById('lowRisk').textContent = stats.low_risk_count;
+    }
+
+    // Format collision probability for display
+    function formatPc(pc) {
+        if (pc === 0) return '0';
+        if (pc < 1e-6) return pc.toExponential(2);
+        if (pc < 0.01) return pc.toExponential(2);
+        return (pc * 100).toFixed(4) + '%';
+    }
+
+    // Update collision probability histogram
+    function updatePcHistogram(data) {
+        const ctx = document.getElementById('pcHistogram').getContext('2d');
+        
+        // Destroy previous chart if exists
+        if (pcHistogramChart) {
+            pcHistogramChart.destroy();
+        }
+        
+        const labels = Object.keys(data);
+        const values = Object.values(data);
+        
+        pcHistogramChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Number of CDMs',
+                    data: values,
+                    backgroundColor: [
+                        '#28a745', // Low risk - green
+                        '#28a745',
+                        '#28a745',
+                        '#fd7e14', // Medium risk - orange
+                        '#fd7e14',
+                        '#dc3545', // High risk - red
+                        '#8b0000'  // Very high risk - dark red
+                    ],
+                    borderColor: [
+                        '#1e7e34',
+                        '#1e7e34',
+                        '#1e7e34',
+                        '#cc6600',
+                        '#cc6600',
+                        '#bd2130',
+                        '#5a0000'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        },
+                        title: {
+                            display: true,
+                            text: 'Count'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Collision Probability Range'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Update events over time chart
+    function updateEventTimeline(data) {
+        const ctx = document.getElementById('eventsTimeline').getContext('2d');
+        
+        // Destroy previous chart if exists
+        if (eventsTimelineChart) {
+            eventsTimelineChart.destroy();
+        }
+        
+        // Sort data by date
+        const sortedData = data.sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        const labels = sortedData.map(item => {
+            const date = new Date(item.date);
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        });
+        
+        const values = sortedData.map(item => item.event_count);
+        
+        eventsTimelineChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Number of Conjunction Events',
+                    data: values,
+                    borderColor: '#1a3a52',
+                    backgroundColor: 'rgba(26, 58, 82, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#1a3a52',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        },
+                        title: {
+                            display: true,
+                            text: 'Event Count'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date (TCA)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Show error message
+    function showError(message) {
+        const errorContainer = document.getElementById('errorContainer');
+        errorContainer.innerHTML = `<div class="error">${message}</div>`;
+    }
+
+    // Load data when page loads
+    document.addEventListener('DOMContentLoaded', loadDashboardData);
+
+    // Refresh data every 5 minutes (optional)
+    setInterval(loadDashboardData, 5 * 60 * 1000);
+</script>
+{% endblock %}
