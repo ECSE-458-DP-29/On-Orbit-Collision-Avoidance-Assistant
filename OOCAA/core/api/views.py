@@ -138,7 +138,7 @@ def globe(request):
     return render(request, "globe.html", context)
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/account/login/')
 def view_cdm(request, pk):
     """Display detailed view of a specific CDM.
     
@@ -173,7 +173,28 @@ class CustomLogoutView(View):
         return redirect('home')
 
 
-@login_required(login_url='/login/')
+def signup(request):
+    """Handle user registration. New users get Observer role by default."""
+    from django.contrib.auth import login
+    from core.forms import SignupForm
+    
+    if request.user.is_authenticated:
+        return redirect('home')
+    
+    if request.method == 'POST':
+        form = SignupForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, f'Welcome {user.username}! Your account has been created.')
+            return redirect('home')
+    else:
+        form = SignupForm()
+    
+    return render(request, 'registration/signup.html', {'form': form})
+
+
+@login_required(login_url='/account/login/')
 def manage_cdms(request):
     """Manage CDMs page with filtering and pagination.
     
@@ -298,7 +319,7 @@ def manage_cdms(request):
     return render(request, 'manage_cdms.html', context)
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/account/login/')
 def upload_cdm(request):
     """Handle CDM file uploads.
     

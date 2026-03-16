@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load two_factor_tags %}
+
+{% block title %}Login - OOCAA{% endblock %}
+
+{% block content %}
+<div class="row mt-5 justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h3 class="mb-0">Login</h3>
+            </div>
+            <div class="card-body">
+                {% if wizard.steps.current == 'token' %}
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-shield-lock"></i> {{ device|as_verbose_action }}
+                </div>
+                {% elif wizard.steps.current == 'backup' %}
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-key"></i> Enter one of your backup tokens to login.
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if wizard.steps.current == 'auth' %}
+                    <div class="mb-3">
+                        <label for="id_auth-username" class="form-label">Username</label>
+                        <input 
+                            type="text" 
+                            class="form-control"
+                            id="id_auth-username"
+                            name="auth-username"
+                            required
+                            autofocus
+                        >
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_auth-password" class="form-label">Password</label>
+                        <input 
+                            type="password" 
+                            class="form-control"
+                            id="id_auth-password"
+                            name="auth-password"
+                            required
+                        >
+                    </div>
+                    {% else %}
+                    {# Token or backup step #}
+                    {% for field in form %}
+                        {% if field.field.widget.input_type == 'checkbox' %}
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="{{ field.id_for_label }}" name="{{ field.html_name }}">
+                            <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        </div>
+                        {% else %}
+                        <div class="mb-3">
+                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                            <input 
+                                type="text" 
+                                class="form-control {% if field.errors %}is-invalid{% endif %}"
+                                id="{{ field.id_for_label }}"
+                                name="{{ field.html_name }}"
+                                {% if field.field.required %}required{% endif %}
+                                autofocus
+                            >
+                            {% if field.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ field.errors }}
+                            </div>
+                            {% endif %}
+                            {% if field.help_text %}
+                            <small class="text-muted">{{ field.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                    {% endif %}
+
+                    {{ wizard.management_form }}
+
+                    {% if other_devices %}
+                    <div class="mb-3">
+                        <p class="text-muted small">Or use another authentication method:</p>
+                        {% for other in other_devices %}
+                        <button name="challenge_device" value="{{ other.persistent_id }}"
+                                class="btn btn-outline-secondary btn-sm me-2" type="submit">
+                            {{ other|as_action }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        {% if wizard.steps.current == 'auth' %}Login{% else %}Verify{% endif %}
+                    </button>
+                </form>
+
+                {% if backup_tokens %}
+                <hr>
+                <form method="post" class="text-center">
+                    {% csrf_token %}
+                    {{ wizard.management_form }}
+                    <button class="btn btn-link p-0 small" name="wizard_goto_step" value="backup" type="submit">
+                        Use a backup token instead
+                    </button>
+                </form>
+                {% endif %}
+
+                <hr>
+                <p class="text-center text-muted small">
+                    Don't have an account? <a href="{% url 'signup' %}">Sign up here</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

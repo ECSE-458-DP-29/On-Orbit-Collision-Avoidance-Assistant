@@ -23,7 +23,7 @@
                 </a>
             </div>
             {% else %}
-            <a class="btn btn-light btn-lg" href="/login/" role="button">
+            <a class="btn btn-light btn-lg" href="{% url 'two_factor:login' %}" role="button">
                 → Login to Get Started
             </a>
             {% endif %}
