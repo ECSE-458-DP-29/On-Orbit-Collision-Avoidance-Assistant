@@ -205,6 +205,12 @@ def manage_cdms(request):
     if request.method == 'POST':
         action = request.POST.get('action')
         cdm_id = request.POST.get('cdm_id')
+
+        can_modify_cdm = request.user.is_superuser or request.user.role in ['admin', 'worker']
+
+        if action == 'delete' and not can_modify_cdm:
+            messages.error(request, "You do not have permission to delete CDMs.")
+            return redirect('manage-cdms')
         
         if action == 'delete' and cdm_id:
             try:
