@@ -37,7 +37,149 @@
   const selectedObjId = {{ selected_obj_id|default:'null' }};
   const km2m = 1000; // Convert kilometers to meters
   const colors = [Cesium.Color.RED, Cesium.Color.BLUE, Cesium.Color.GREEN, Cesium.Color.YELLOW, Cesium.Color.PURPLE];
-  
+
+  // ─── Orbital trajectory propagation ────────────────────────────────────────
+  // CDM positions are in the ITRF (ECEF) frame, units: km and km/s.
+  // To propagate a Keplerian orbit we transform to ECI, integrate Newton's
+  // two-body equation with a 4th-order Runge-Kutta, then convert each
+  // propagated ECI point back to ECEF (accounting for Earth's rotation).
+
+  const GM      = 3.986004418e14;   // Earth GM  (m³ s⁻²)
+  const W_EARTH = 7.29211509e-5;    // Earth rotation rate (rad s⁻¹)
+
+  /** Julian date from a JS Date. */
+  function julianDate(date) {
+    return date.getTime() / 86400000.0 + 2440587.5;
+  }
+
+  /** Greenwich Mean Sidereal Time (radians) at a given JS Date. */
+  function gmst(date) {
+    const D = julianDate(date) - 2451545.0; // days from J2000.0
+    const deg = ((280.46061837 + 360.98564736629 * D) % 360 + 360) % 360;
+    return deg * Math.PI / 180.0;
+  }
+
+  /**
+   * Convert ECEF state (km, km/s) → ECI state (m, m/s)
+   * using the rotation angle theta (GMST at epoch).
+   *
+   * Convention:  r_ECEF = Rz(θ) · r_ECI
+   *  ⇒           r_ECI  = Rz(-θ) · r_ECEF
+   */
+  function ecefToEci(px, py, pz, vx, vy, vz, theta) {
+    // Convert km → m
+    px *= 1000; py *= 1000; pz *= 1000;
+    vx *= 1000; vy *= 1000; vz *= 1000;
+
+    const ct = Math.cos(theta), st = Math.sin(theta);
+
+    // Position in ECI
+    const rx = ct * px - st * py;
+    const ry = st * px + ct * py;
+    const rz = pz;
+
+    // Velocity in ECI: v_eci = Rz(-θ)·v_ecef + ω×r_eci  (ω = [0,0,W_EARTH])
+    const vxr = ct * vx - st * vy;
+    const vyr = st * vx + ct * vy;
+    return {
+      pos: [rx, ry, rz],
+      vel: [vxr - W_EARTH * ry, vyr + W_EARTH * rx, vz]
+    };
+  }
+
+  /**
+   * Convert ECI position (m) → ECEF (m) at rotation angle theta.
+   * r_ECEF = Rz(θ) · r_ECI
+   */
+  function eciToEcef(x, y, z, theta) {
+    const ct = Math.cos(theta), st = Math.sin(theta);
+    return [ct * x + st * y, -st * x + ct * y, z];
+  }
+
+  /** Two-body gravitational acceleration (ECI, m → m s⁻²). */
+  function gravAccel(p) {
+    const r2 = p[0]*p[0] + p[1]*p[1] + p[2]*p[2];
+    const f  = -GM / (r2 * Math.sqrt(r2));
+    return [f * p[0], f * p[1], f * p[2]];
+  }
+
+  /** Single RK4 step for the two-body problem. */
+  function rk4(pos, vel, dt) {
+    const a1 = gravAccel(pos);
+    const p2 = pos.map((p,i) => p + 0.5*dt*vel[i]);
+    const v2 = vel.map((v,i) => v + 0.5*dt*a1[i]);
+    const a2 = gravAccel(p2);
+    const p3 = pos.map((p,i) => p + 0.5*dt*v2[i]);
+    const v3 = vel.map((v,i) => v + 0.5*dt*a2[i]);
+    const a3 = gravAccel(p3);
+    const p4 = pos.map((p,i) => p + dt*v3[i]);
+    const v4 = vel.map((v,i) => v + dt*a3[i]);
+    const a4 = gravAccel(p4);
+    return {
+      pos: pos.map((p,i) => p + (dt/6)*(vel[i] + 2*v2[i] + 2*v3[i] + v4[i])),
+      vel: vel.map((v,i) => v + (dt/6)*(a1[i] + 2*a2[i] + 2*a3[i] + a4[i]))
+    };
+  }
+
+  /**
+   * Propagate one full Keplerian orbit and return an array of
+   * Cesium.Cartesian3 positions (ECEF, metres) starting from TCA.
+   *
+   * Returns null if the position/velocity/TCA data are missing, or if
+   * the orbit turns out to be hyperbolic / implausibly large.
+   */
+  function computeOrbitTrajectory(px_km, py_km, pz_km, vx_kms, vy_kms, vz_kms, tcaIso) {
+    if (px_km == null || vx_kms == null || tcaIso == null) return null;
+
+    const tcaDate = new Date(tcaIso);
+    const theta0  = gmst(tcaDate);
+    const s0      = ecefToEci(px_km, py_km, pz_km, vx_kms, vy_kms, vz_kms, theta0);
+
+    // Compute orbital period from vis-viva:  T = 2π √(a³/GM)
+    const r  = Math.sqrt(s0.pos[0]**2 + s0.pos[1]**2 + s0.pos[2]**2);
+    const v2 = s0.vel[0]**2 + s0.vel[1]**2 + s0.vel[2]**2;
+    const a  = 1.0 / (2.0/r - v2/GM);           // semi-major axis (m)
+    if (a <= 0 || a > 1e9) return null;          // hyperbolic or unreasonable
+    const period = 2 * Math.PI * Math.sqrt(a**3 / GM);   // seconds
+    if (period > 86400) return null;             // skip orbits > 1 day
+
+    const dt       = 30;                          // step size (seconds)
+    const numSteps = Math.ceil(period / dt) + 1;
+
+    const positions = [];
+    let pos = s0.pos.slice();
+    let vel = s0.vel.slice();
+
+    for (let i = 0; i <= numSteps; i++) {
+      const theta = theta0 + W_EARTH * i * dt;
+      const ecef  = eciToEcef(pos[0], pos[1], pos[2], theta);
+      positions.push(new Cesium.Cartesian3(ecef[0], ecef[1], ecef[2]));
+      const next = rk4(pos, vel, dt);
+      pos = next.pos;
+      vel = next.vel;
+    }
+    return positions;
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Create a transparent canvas with white text (no rectangular background)
+  function createLabelCanvas(text, isSelected) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const font = isSelected ? 'bold 13pt Arial, sans-serif' : '11pt Arial, sans-serif';
+    ctx.font = font;
+    const w = Math.ceil(ctx.measureText(text).width) + 12;
+    canvas.width  = w;
+    canvas.height = 26;
+    ctx.clearRect(0, 0, w, 26);
+    ctx.font = font; // reset after canvas resize
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur  = 4;
+    ctx.fillStyle = 'white';
+    ctx.fillText(text, 6, 20);
+    return canvas;
+  }
+
   // Add satellites from CDM database
   let colorIndex = 0;
   cdmsData.forEach((cdm, index) => {
@@ -72,16 +214,35 @@
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: isSelected ? 3 : 2,
         },
-        label: {
-          text: cdm.obj1_name + (isSelected ? ' (SELECTED)' : ''),
-          font: isSelected ? 'bold 14pt monospace' : '12pt monospace',
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineWidth: 2,
+        billboard: {
+          image: createLabelCanvas(cdm.obj1_name + (isSelected ? ' (SELECTED)' : ''), isSelected),
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -15),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         description: new Cesium.CallbackProperty(() => description1, false)
       });
+
+      // Draw orbital trajectory for Object 1
+      const traj1 = computeOrbitTrajectory(
+        cdm.obj1_x, cdm.obj1_y, cdm.obj1_z,
+        cdm.obj1_vx, cdm.obj1_vy, cdm.obj1_vz,
+        cdm.tca
+      );
+      if (traj1) {
+        viewer.entities.add({
+          name: cdm.obj1_name + ' Trajectory',
+          polyline: {
+            positions: traj1,
+            width: 1.5,
+            material: new Cesium.PolylineGlowMaterialProperty({
+              glowPower: 0.15,
+              color: color1.withAlpha(0.6),
+            }),
+            clampToGround: false,
+          }
+        });
+      }
     }
     
     // Add Object 2 satellite
@@ -115,17 +276,36 @@
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: isSelected ? 3 : 2,
         },
-        label: {
-          text: cdm.obj2_name + (isSelected ? ' (SELECTED)' : ''),
-          font: isSelected ? 'bold 14pt monospace' : '12pt monospace',
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineWidth: 2,
+        billboard: {
+          image: createLabelCanvas(cdm.obj2_name + (isSelected ? ' (SELECTED)' : ''), isSelected),
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -15),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         description: new Cesium.CallbackProperty(() => description2, false)
       });
-      
+
+      // Draw orbital trajectory for Object 2
+      const traj2 = computeOrbitTrajectory(
+        cdm.obj2_x, cdm.obj2_y, cdm.obj2_z,
+        cdm.obj2_vx, cdm.obj2_vy, cdm.obj2_vz,
+        cdm.tca
+      );
+      if (traj2) {
+        viewer.entities.add({
+          name: cdm.obj2_name + ' Trajectory',
+          polyline: {
+            positions: traj2,
+            width: 1.5,
+            material: new Cesium.PolylineGlowMaterialProperty({
+              glowPower: 0.15,
+              color: color2.withAlpha(0.6),
+            }),
+            clampToGround: false,
+          }
+        });
+      }
+
       // If this object is selected, fly camera to it
       if (isSelected) {
         viewer.camera.flyTo({

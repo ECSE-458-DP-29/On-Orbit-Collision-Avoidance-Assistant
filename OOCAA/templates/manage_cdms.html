@@ -375,6 +375,9 @@
                                         <a href="/cdms/{{ cdm.id }}/" class="btn btn-outline-primary btn-sm" title="View Details">
                                             <i class="bi bi-eye"></i> View
                                         </a>
+                                        <a href="/globe/?cdm_pk={{ cdm.id }}" class="btn btn-outline-secondary btn-sm" title="View on Globe">
+                                            <i class="bi bi-globe"></i> Globe
+                                        </a>
                                         <form method="post" action="/manage/cdms/" style="display: inline;" onsubmit="return confirm('Delete this CDM?');">
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="delete">

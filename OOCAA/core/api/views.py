@@ -54,50 +54,60 @@ def globe(request):
     """
     from django.db.models import Max, Q
     
-    # Get optional object_id parameter to filter for a specific object
+    # Get optional query parameters
     obj_id = request.GET.get('obj_id', None)
-    
-    # Group CDMs by event and get only the latest one for each event
-    # Also filter by object if specified
-    queryset = CDM.objects.filter(event__isnull=False)
-    
-    if obj_id:
+    cdm_pk = request.GET.get('cdm_pk', None)
+
+    # --- Filter: single CDM by primary key (used by the "View on Globe" button) ---
+    if cdm_pk:
         try:
-            obj_id = int(obj_id)
-            # Filter CDMs that include this object (either obj1 or obj2)
-            queryset = queryset.filter(Q(obj1_id=obj_id) | Q(obj2_id=obj_id))
+            cdm_pk = int(cdm_pk)
+            cdms = CDM.objects.filter(pk=cdm_pk).select_related('obj1', 'obj2')
+            obj_id = None  # ignore obj_id when cdm_pk is given
         except ValueError:
-            pass
-    
-    # Get CDMs grouped by event with latest creation_date
-    events_with_cdms = queryset.values('event_id').annotate(
-        latest_creation_date=Max('creation_date')
-    )
-    
-    # Collect CDMs: latest from each event + CDMs without events
-    cdms = CDM.objects.filter(event__isnull=True)  # CDMs without events
-    
-    if obj_id:
-        try:
-            obj_id = int(obj_id)
-            # Also filter CDMs without events by object
-            cdms = cdms.filter(Q(obj1_id=obj_id) | Q(obj2_id=obj_id))
-        except ValueError:
-            pass
-    
-    for event_info in events_with_cdms:
-        event_id = event_info['event_id']
-        latest_date = event_info['latest_creation_date']
-        # Get the CDM with latest creation_date for this event
-        latest_cdm = CDM.objects.filter(
-            event_id=event_id,
-            creation_date=latest_date
-        ).select_related('obj1', 'obj2').first()
-        if latest_cdm:
-            cdms = cdms | CDM.objects.filter(pk=latest_cdm.pk)
-    
-    # Ensure we have related objects
-    cdms = cdms.select_related('obj1', 'obj2')
+            cdms = CDM.objects.none()
+    else:
+        # Group CDMs by event and get only the latest one for each event
+        # Also filter by object if specified
+        queryset = CDM.objects.filter(event__isnull=False)
+
+        if obj_id:
+            try:
+                obj_id = int(obj_id)
+                # Filter CDMs that include this object (either obj1 or obj2)
+                queryset = queryset.filter(Q(obj1_id=obj_id) | Q(obj2_id=obj_id))
+            except ValueError:
+                pass
+
+        # Get CDMs grouped by event with latest creation_date
+        events_with_cdms = queryset.values('event_id').annotate(
+            latest_creation_date=Max('creation_date')
+        )
+
+        # Collect CDMs: latest from each event + CDMs without events
+        cdms = CDM.objects.filter(event__isnull=True)  # CDMs without events
+
+        if obj_id:
+            try:
+                obj_id = int(obj_id)
+                # Also filter CDMs without events by object
+                cdms = cdms.filter(Q(obj1_id=obj_id) | Q(obj2_id=obj_id))
+            except ValueError:
+                pass
+
+        for event_info in events_with_cdms:
+            event_id = event_info['event_id']
+            latest_date = event_info['latest_creation_date']
+            # Get the CDM with latest creation_date for this event
+            latest_cdm = CDM.objects.filter(
+                event_id=event_id,
+                creation_date=latest_date
+            ).select_related('obj1', 'obj2').first()
+            if latest_cdm:
+                cdms = cdms | CDM.objects.filter(pk=latest_cdm.pk)
+
+        # Ensure we have related objects
+        cdms = cdms.select_related('obj1', 'obj2')
     
     # Serialize CDM data to JSON for JavaScript
     cdm_data = []
@@ -109,11 +119,18 @@ def globe(request):
             'obj1_x': cdm.obj1_position_x,
             'obj1_y': cdm.obj1_position_y,
             'obj1_z': cdm.obj1_position_z,
+            'obj1_vx': cdm.obj1_velocity_x,
+            'obj1_vy': cdm.obj1_velocity_y,
+            'obj1_vz': cdm.obj1_velocity_z,
             'obj2_name': cdm.obj2.object_name if cdm.obj2 else 'Unknown',
             'obj2_id': cdm.obj2.id if cdm.obj2 else None,
             'obj2_x': cdm.obj2_position_x,
             'obj2_y': cdm.obj2_position_y,
             'obj2_z': cdm.obj2_position_z,
+            'obj2_vx': cdm.obj2_velocity_x,
+            'obj2_vy': cdm.obj2_velocity_y,
+            'obj2_vz': cdm.obj2_velocity_z,
+            'tca': cdm.tca.isoformat() if cdm.tca else None,
             'miss_distance_m': cdm.miss_distance_m,
             'collision_probability': float(cdm.collision_probability) if cdm.collision_probability else None,
         })
