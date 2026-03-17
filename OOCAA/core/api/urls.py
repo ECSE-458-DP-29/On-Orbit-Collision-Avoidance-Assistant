@@ -10,6 +10,7 @@ from .views import (
     upload_cdm,
     globe,
     view_cdm,
+    dashboard,
     CDMListCreateView,
     CDMDetailView,
     SpaceObjectListCreateView,
@@ -17,12 +18,14 @@ from .views import (
     CalculatePcView,
     BatchCalculatePcView,
     ParseCDMJsonView,
+    DashboardDataView,
 )
 
 urlpatterns = [
     # Landing page
     path('api/', api_index, name='api-index'),
     path('globe/', globe, name='globe'),
+    path('dashboard/', dashboard, name='dashboard'),
     
     # Management pages
     path('manage/cdms/', manage_cdms, name='manage-cdms'),
@@ -41,4 +44,7 @@ urlpatterns = [
     path('spaceobjects/', SpaceObjectListCreateView.as_view(), name='spaceobject-list-create'),
     # Event endpoints
     path('events/', EventListView.as_view(), name='event-list'),
+    
+    # Dashboard API endpoints
+    path('api/dashboard-data/', DashboardDataView.as_view(), name='dashboard-data'),
 ]

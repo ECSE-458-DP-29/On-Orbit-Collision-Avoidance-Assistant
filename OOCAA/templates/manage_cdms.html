@@ -378,6 +378,7 @@
                                         <a href="/globe/?cdm_pk={{ cdm.id }}" class="btn btn-outline-secondary btn-sm" title="View on Globe">
                                             <i class="bi bi-globe"></i> Globe
                                         </a>
+                                        {% if user.is_superuser or user.role == 'admin' or user.role == 'worker' %}
                                         <form method="post" action="/manage/cdms/" style="display: inline;" onsubmit="return confirm('Delete this CDM?');">
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="delete">
@@ -386,6 +387,7 @@
                                                 <i class="bi bi-trash"></i> Delete
                                             </button>
                                         </form>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>

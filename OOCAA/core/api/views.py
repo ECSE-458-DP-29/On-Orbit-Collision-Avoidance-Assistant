@@ -138,7 +138,7 @@ def globe(request):
     return render(request, "globe.html", context)
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/account/login/')
 def view_cdm(request, pk):
     """Display detailed view of a specific CDM.
     
@@ -173,7 +173,28 @@ class CustomLogoutView(View):
         return redirect('home')
 
 
-@login_required(login_url='/login/')
+def signup(request):
+    """Handle user registration. New users get Observer role by default."""
+    from django.contrib.auth import login
+    from core.forms import SignupForm
+    
+    if request.user.is_authenticated:
+        return redirect('home')
+    
+    if request.method == 'POST':
+        form = SignupForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, f'Welcome {user.username}! Your account has been created.')
+            return redirect('home')
+    else:
+        form = SignupForm()
+    
+    return render(request, 'registration/signup.html', {'form': form})
+
+
+@login_required(login_url='/account/login/')
 def manage_cdms(request):
     """Manage CDMs page with filtering and pagination.
     
@@ -184,6 +205,12 @@ def manage_cdms(request):
     if request.method == 'POST':
         action = request.POST.get('action')
         cdm_id = request.POST.get('cdm_id')
+
+        can_modify_cdm = request.user.is_superuser or request.user.role in ['admin', 'worker']
+
+        if action == 'delete' and not can_modify_cdm:
+            messages.error(request, "You do not have permission to delete CDMs.")
+            return redirect('manage-cdms')
         
         if action == 'delete' and cdm_id:
             try:
@@ -298,7 +325,7 @@ def manage_cdms(request):
     return render(request, 'manage_cdms.html', context)
 
 
-@login_required(login_url='/login/')
+@login_required(login_url='/account/login/')
 def upload_cdm(request):
     """Handle CDM file uploads.
     
@@ -767,6 +794,154 @@ class ParseCDMJsonView(APIView):
         except Exception as e:
             # Handle errors and return a 400 Bad Request response
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@login_required(login_url='/account/login/')
+def dashboard(request):
+    """Render the analytics dashboard page.
+    
+    Displays visualizations for collision probabilities and conjunction events over time.
+    """
+    return render(request, 'dashboard.html')
+
+
+class DashboardDataView(APIView):
+    """API endpoint to retrieve dashboard analytics data.
+    
+    GET: Returns aggregated data for visualizations:
+    - Collision probability distribution (histogram)
+    - Conjunction events over time (timeline)
+    - Event statistics
+    """
+    
+    def get(self, request, *args, **kwargs):
+        """Get dashboard data for visualizations."""
+        from django.db.models import Count, Min, Max, Avg, Q
+        from datetime import datetime, timedelta
+        
+        # Get all CDMs and events
+        cdms = CDM.objects.filter(collision_probability__isnull=False).select_related('obj1', 'obj2', 'event')
+        events = CDM.objects.filter(event__isnull=False).values('event').distinct()
+        
+        # --- Collision Probability Distribution ---
+        # Bin collision probabilities into ranges for histogram
+        pc_bins = {
+            '0-1e-6': 0,
+            '1e-6-1e-5': 0,
+            '1e-5-1e-4': 0,
+            '1e-4-1e-3': 0,
+            '1e-3-1e-2': 0,
+            '1e-2-0.1': 0,
+            '0.1+': 0,
+        }
+        
+        for cdm in cdms:
+            if cdm.collision_probability:
+                pc = float(cdm.collision_probability)
+                if pc < 1e-6:
+                    pc_bins['0-1e-6'] += 1
+                elif pc < 1e-5:
+                    pc_bins['1e-6-1e-5'] += 1
+                elif pc < 1e-4:
+                    pc_bins['1e-5-1e-4'] += 1
+                elif pc < 1e-3:
+                    pc_bins['1e-4-1e-3'] += 1
+                elif pc < 1e-2:
+                    pc_bins['1e-3-1e-2'] += 1
+                elif pc < 0.1:
+                    pc_bins['1e-2-0.1'] += 1
+                else:
+                    pc_bins['0.1+'] += 1
+        
+        # --- Conjunction Events Over Time ---
+        # Group CDMs by TCA date and count events
+        from django.db.models.functions import TruncDate
+        events_over_time = CDM.objects.filter(
+            event__isnull=False
+        ).annotate(
+            tca_date=TruncDate('tca')
+        ).values('tca_date').annotate(
+            count=Count('event', distinct=True)
+        ).order_by('tca_date')
+        
+        timeline_data = []
+        for item in events_over_time:
+            if item['tca_date']:
+                timeline_data.append({
+                    'date': item['tca_date'].isoformat(),
+                    'event_count': item['count']
+                })
+        
+        # --- PC Evolution Over Time (by Satellite Pair) ---
+        pc_evolution_data = {}
+        cdms_sorted = cdms.order_by('tca')
+        
+        for cdm in cdms_sorted:
+            if cdm.obj1 and cdm.obj2:
+                # Create a key for the satellite pair
+                pair_key = f"{cdm.obj1.object_designator} vs {cdm.obj2.object_designator}"
+                
+                if pair_key not in pc_evolution_data:
+                    pc_evolution_data[pair_key] = {
+                        'pair': pair_key,
+                        'data_points': []
+                    }
+                
+                pc_evolution_data[pair_key]['data_points'].append({
+                    'tca': cdm.tca.isoformat() if cdm.tca else None,
+                    'pc': float(cdm.collision_probability),
+                    'creation_date': cdm.creation_date.isoformat() if cdm.creation_date else None,
+                })
+        
+        # Convert to list and limit to top 5 satellite pairs by number of observations
+        pc_evolution_list = sorted(
+            pc_evolution_data.values(),
+            key=lambda x: len(x['data_points']),
+            reverse=True
+        )[:5]
+        
+        # --- Risk Distribution (High/Medium/Low) ---
+        risk_distribution = {
+            'High Risk (≥1e-3)': cdms.filter(collision_probability__gte=1e-3).count(),
+            'Medium Risk (1e-5 to 1e-3)': cdms.filter(
+                collision_probability__gte=1e-5,
+                collision_probability__lt=1e-3
+            ).count(),
+            'Low Risk (<1e-5)': cdms.filter(collision_probability__lt=1e-5).count(),
+        }
+        
+        # --- Event Statistics ---
+        pc_stats = cdms.aggregate(
+            avg_pc=Avg('collision_probability'),
+            min_pc=Min('collision_probability'),
+            max_pc=Max('collision_probability'),
+        )
+        
+        high_risk_count = cdms.filter(collision_probability__gte=1e-3).count()
+        medium_risk_count = cdms.filter(
+            collision_probability__gte=1e-5,
+            collision_probability__lt=1e-3
+        ).count()
+        low_risk_count = cdms.filter(collision_probability__lt=1e-5).count()
+        
+        # Return data for frontend
+        return Response({
+            'collision_probability_distribution': pc_bins,
+            'events_over_time': timeline_data,
+            'pc_evolution': pc_evolution_list,
+            'risk_distribution': risk_distribution,
+            'statistics': {
+                'total_cdms': cdms.count(),
+                'total_events': events.count(),
+                'avg_collision_probability': float(pc_stats['avg_pc']) if pc_stats['avg_pc'] else None,
+                'min_collision_probability': float(pc_stats['min_pc']) if pc_stats['min_pc'] else None,
+                'max_collision_probability': float(pc_stats['max_pc']) if pc_stats['max_pc'] else None,
+                'high_risk_count': high_risk_count,
+                'medium_risk_count': medium_risk_count,
+                'low_risk_count': low_risk_count,
+            }
+        }, status=status.HTTP_200_OK)
+
     
 __all__ = [
     "home",
@@ -776,6 +951,7 @@ __all__ = [
     "api_index",
     "manage_cdms",
     "upload_cdm",
+    "dashboard",
     "CDMListCreateView",
     "CDMDetailView",
     "SpaceObjectListCreateView",
@@ -783,4 +959,5 @@ __all__ = [
     "CalculatePcView",
     "BatchCalculatePcView",
     "ParseCDMJsonView",
+    "DashboardDataView",
 ]
