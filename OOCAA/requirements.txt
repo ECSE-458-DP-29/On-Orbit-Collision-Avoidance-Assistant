@@ -1,0 +1,18 @@
+asgiref==3.10.0
+Django==5.2.7
+sqlparse==0.5.3
+tzdata==2025.2
+djangorestframework==3.16.1
+drf-spectacular==0.27.0
+psycopg[binary]>=3.1.0
+python-decouple==3.8
+
+# MATLAB Engine for Python (install separately from MATLAB installation)
+# Installation: cd "C:\Program Files\MATLAB\R2025b\extern\engines\python" && python setup.py install
+# matlabengine==25.2  # Installed from MATLAB, not via pip
+
+# Scientific computing for data conversions
+numpy>=1.24.0
+
+# Email and CDM ingestion
+imap-tools>=1.4.1
