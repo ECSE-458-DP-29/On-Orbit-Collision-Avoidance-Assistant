@@ -155,3 +155,7 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
 }
+
+EMAIL_USERNAME = config('EMAIL_USERNAME', default='')
+EMAIL_PASSWORD = config('EMAIL_PASSWORD', default='')
+EMAIL_IMAP_SERVER = config('EMAIL_IMAP_SERVER', default='')
