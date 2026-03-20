@@ -40,12 +40,42 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_HOST=db
       - DB_PORT=5432
+      - DB_PASSWORD=${DB_PASSWORD}
+      - EMAIL_IMAP_SERVER=${EMAIL_IMAP_SERVER}
+      - EMAIL_USERNAME=${EMAIL_USERNAME}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
     depends_on:
       db:
         condition: service_healthy
     networks:
       - oocaa_network
+
+  # Email Listener Service (listens for CDM attachments)
+  email-listener:
+    build: .
+    container_name: oocaa_email_listener
+    command: python manage.py email_cdm_ingest
+    volumes:
+      - ./OOCAA:/app
+    environment:
+      - DEBUG=${DEBUG:-True}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-local-dev-only}
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=${DB_NAME:-oocaa_db}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - EMAIL_IMAP_SERVER=${EMAIL_IMAP_SERVER}
+      - EMAIL_USERNAME=${EMAIL_USERNAME}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - oocaa_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
