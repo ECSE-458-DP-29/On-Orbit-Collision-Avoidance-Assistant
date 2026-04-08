@@ -6,6 +6,8 @@ import time
 import logging
 import ssl
 from imap_tools import MailBox, AND
+from django.conf import settings
+from core.services.notification import notify_high_pc
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
@@ -102,9 +104,11 @@ def process_cdm_attachment(payload_bytes, auto_calculate_pc=True):
             if auto_calculate_pc:
                 try:
                     calc_result = calculate_pc_multistep(cdm, None)
+                    notify_high_pc(cdm, cdm.collision_probability)
                     if calc_result.get("success"):
                         update_cdm_with_pc_result(cdm, calc_result, save=True)
                 except Exception as e:
+                    logger.warning(f"PC calculation failed for CDM #{cdm.id}: {e}")
                     results["errors"].append(f"CDM {cdm.cdm_id} saved, Pc calc failed: {e}")
         except Exception as e:
             results["failed"] += 1
