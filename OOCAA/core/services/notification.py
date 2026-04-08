@@ -30,20 +30,6 @@ def send_collision_email_notification(cdm, pc_value, recipients=None):
     logger.info("Sent high-Pc email notification for CDM %s", cdm.cdm_id)
 
 
-# def send_collision_sms_notification(cdm, pc_value, phone_number):
-#     if not phone_number:
-#         logger.warning("No phone number supplied for high-Pc SMS.")
-#         return
-
-#     # If you want to use an SMS gateway via email
-#     sms_address = f"{phone_number}@{settings.SMS_GATEWAY_DOMAIN}"
-#     subject = ""
-#     body = f"High Pc {pc_value:.2e} for CDM {cdm.cdm_id} at {cdm.tca}"
-#     send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [sms_address], fail_silently=False)
-#     logger.info("Sent high-Pc SMS notification for CDM %s", cdm.cdm_id)
-
-# from twilio.rest import Client
-
 def send_collision_sms_notification(cdm, pc_value, phone=None):
     phone = phone or getattr(settings, "PC_NOTIFICATION_PHONE_NUMBER", None)
     if not phone:
