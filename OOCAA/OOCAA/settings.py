@@ -28,6 +28,30 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'core.utils.email_client': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+        'core.services.notification': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+        'core.services.pc_calculation_service': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+    },
+}
 
 # Application definition
 
@@ -164,6 +188,24 @@ SPECTACULAR_SETTINGS = {
     'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
 }
 
+# email receiving
 EMAIL_USERNAME = config('EMAIL_USERNAME', default='')
 EMAIL_PASSWORD = config('EMAIL_PASSWORD', default='')
 EMAIL_IMAP_SERVER = config('EMAIL_IMAP_SERVER', default='')
+ 
+# email sending
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_PORT = config('EMAIL_PORT', cast=int, default=587)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool, default=True)
+
+PC_NOTIFICATION_THRESHOLD = 0.000000005
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='')
+PC_NOTIFICATION_EMAILS = config('PC_NOTIFICATION_EMAILS', default='', cast=lambda v: [email.strip() for email in v.split(',') if email.strip()])
+PC_NOTIFICATION_PHONE_NUMBER = config('PC_NOTIFICATION_PHONE_NUMBER', default='')
+SMS_GATEWAY_DOMAIN = config('SMS_GATEWAY_DOMAIN', default='')
+
+TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')
+TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN', default='')
+TWILIO_FROM_NUMBER = config('TWILIO_FROM_NUMBER', default='')
