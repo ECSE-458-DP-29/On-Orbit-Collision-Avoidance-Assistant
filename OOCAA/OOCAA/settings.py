@@ -192,7 +192,7 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 EMAIL_PORT = config('EMAIL_PORT', cast=int, default=587)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool, default=True)
 
-PC_NOTIFICATION_THRESHOLD = 0
+PC_NOTIFICATION_THRESHOLD = 0.000000005
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='')
 PC_NOTIFICATION_EMAILS = config('PC_NOTIFICATION_EMAILS', default='', cast=lambda v: [email.strip() for email in v.split(',') if email.strip()])
 PC_NOTIFICATION_PHONE_NUMBER = config('PC_NOTIFICATION_PHONE_NUMBER', default='')
