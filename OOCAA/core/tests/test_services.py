@@ -1,7 +1,9 @@
 import json
+import pytest
 from django.test import TestCase
 from core.services.cdm_service import parse_cdm_json
 from core.models import CDM, SpaceObject
+from core.tests.factories import CDMFactory, SpaceObjectFactory, EventFactory
 
 
 class CDMServiceTest(TestCase):
@@ -31,3 +33,80 @@ class CDMServiceTest(TestCase):
         # Check state vectors (example)
         self.assertIn("x_km", cdm.state_vector_obj1)
         self.assertEqual(cdm.state_vector_obj1["x_km"], "893.2881302848575")
+
+    def test_parse_cdm_json_creates_space_objects(self):
+        """Test that parse_cdm_json creates or fetches space objects correctly."""
+        cdm_data = {
+            "CCSDS_CDM_VERS": "1.0",
+            "CREATION_DATE": "2025-01-20T08:12:49Z",
+            "ORIGINATOR": "TestOrg",
+            "MESSAGE_ID": "TEST_MSG_001",
+            "TCA": "2025-01-25T07:24:13Z",
+            "MISS_DISTANCE": "31612",
+            "COLLISION_PROBABILITY": "1.3e-08",
+            "SAT1_OBJECT_DESIGNATOR": "99999",
+            "SAT1_OBJECT_NAME": "TestSat1",
+            "SAT1_OBJECT_TYPE": "PAYLOAD",
+            "SAT1_OPERATOR_ORGANIZATION": "TestOrg1",
+            "SAT1_MANEUVERABLE": "NO",
+            "SAT1_X": "1000.0",
+            "SAT1_Y": "2000.0",
+            "SAT1_Z": "3000.0",
+            "SAT1_X_DOT": "-5.0",
+            "SAT1_Y_DOT": "6.0",
+            "SAT1_Z_DOT": "0.5",
+            "SAT2_OBJECT_DESIGNATOR": "88888",
+            "SAT2_OBJECT_NAME": "TestSat2",
+            "SAT2_OBJECT_TYPE": "DEBRIS",
+            "SAT2_OPERATOR_ORGANIZATION": "TestOrg2",
+            "SAT2_MANEUVERABLE": "YES",
+            "SAT2_X": "2000.0",
+            "SAT2_Y": "3000.0",
+            "SAT2_Z": "4000.0",
+            "SAT2_X_DOT": "-8.0",
+            "SAT2_Y_DOT": "10.0",
+            "SAT2_Z_DOT": "1.5",
+        }
+        
+        cdm, obj1, obj2 = parse_cdm_json(cdm_data)
+        
+        self.assertIsNotNone(obj1)
+        self.assertIsNotNone(obj2)
+        self.assertEqual(obj1.object_designator, "99999")
+        self.assertEqual(obj2.object_designator, "88888")
+
+
+
+@pytest.mark.django_db
+class TestCDMFactoryAndRelationships:
+    """Additional tests for CDM factory and relationships."""
+
+    def test_cdm_factory_creates_related_objects(self):
+        """Test CDM factory creates related space objects."""
+        cdm = CDMFactory()
+        assert cdm.obj1 is not None
+        assert cdm.obj2 is not None
+        assert SpaceObject.objects.filter(id=cdm.obj1.id).exists()
+        assert SpaceObject.objects.filter(id=cdm.obj2.id).exists()
+
+    def test_multiple_cdms_for_same_objects(self):
+        """Test creating multiple CDMs for same object pair."""
+        obj1 = SpaceObjectFactory()
+        obj2 = SpaceObjectFactory()
+        
+        cdm1 = CDMFactory(obj1=obj1, obj2=obj2)
+        cdm2 = CDMFactory(obj1=obj1, obj2=obj2)
+        
+        assert cdm1.id != cdm2.id
+        assert cdm1.obj1 == cdm2.obj1
+    
+    def test_cdm_with_event_relationship(self):
+        """Test CDM with associated event."""
+        obj1 = SpaceObjectFactory()
+        obj2 = SpaceObjectFactory()
+        event = EventFactory(obj1=obj1, obj2=obj2)
+        cdm = CDMFactory(obj1=obj1, obj2=obj2, event=event)
+        
+        assert cdm.event == event
+        assert event.obj1 == obj1
+        assert event.obj2 == obj2
