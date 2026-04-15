@@ -589,9 +589,11 @@ def calculate_pc_monte_carlo(cdm, sample_count: int = 50000, seed: Optional[int]
                 if cara_root:
                     sdmc_lib = os.path.join(cara_root, 'ProbabilityOfCollision', 'SDMC_Utils', 'lib')
                     if os.path.isdir(sdmc_lib):
-                        existing = eng.getenv('PATH')
-                        if sdmc_lib not in existing.split(';'):
-                            eng.setenv('PATH', f"{sdmc_lib};{existing}", nargout=0)
+                        existing = eng.getenv('PATH') or ''
+                        existing_paths = existing.split(os.pathsep) if existing else []
+                        if sdmc_lib not in existing_paths:
+                            updated_path = os.pathsep.join([sdmc_lib, existing]) if existing else sdmc_lib
+                            eng.setenv('PATH', updated_path, nargout=0)
 
                 # Build SDMC params from defaults and override practical knobs.
                 params_struct = eng.default_params_Pc_SDMC(eng.struct(), nargout=1)
