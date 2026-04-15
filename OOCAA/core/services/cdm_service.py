@@ -3,14 +3,38 @@
 Keep creation/auxiliary logic here so views/controllers stay thin.
 """
 from typing import Any, Dict, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 
 from django.db import transaction
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from core.models.cdm import CDM
 from core.models.event import Event
 from core.models.spaceobject import SpaceObject
+
+
+def _parse_datetime_utc(value):
+    """Parse input into a timezone-aware UTC datetime when possible."""
+    if value is None:
+        return None
+
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        dt = parse_datetime(value)
+        if dt is None:
+            try:
+                dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            except ValueError:
+                return None
+    else:
+        return None
+
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone=dt_timezone.utc)
+    return dt.astimezone(dt_timezone.utc)
 
 
 @transaction.atomic
@@ -265,11 +289,9 @@ def assign_cdm_to_event(cdm: CDM, tca_threshold_seconds: int = 10) -> Event:
     if not cdm.obj1 or not cdm.obj2:
         raise ValueError("CDM must have both obj1 and obj2 to be assigned to an event")
     
-    # Parse TCA if it's a string
-    if isinstance(cdm.tca, str):
-        cdm_tca = datetime.fromisoformat(cdm.tca.replace('Z', '+00:00')).replace(tzinfo=None)
-    else:
-        cdm_tca = cdm.tca
+    cdm_tca = _parse_datetime_utc(cdm.tca)
+    if cdm_tca is None:
+        raise ValueError("CDM TCA is invalid or missing")
     # Normalize object pair order (always store lower ID first)
     obj1, obj2 = _normalize_object_pair(cdm.obj1, cdm.obj2)
     
@@ -505,8 +527,8 @@ def parse_cdm_json(data: dict) -> CDM:
     cdm = CDM.objects.create(
         cdm_id=cdm_id,
         message_id=data.get("MESSAGE_ID"),
-        creation_date=data.get("CREATION_DATE"),
-        insert_epoch=data.get("INSERT_EPOCH"),
+        creation_date=_parse_datetime_utc(data.get("CREATION_DATE")),
+        insert_epoch=_parse_datetime_utc(data.get("INSERT_EPOCH")),
         ccsds_version=data.get("CCSDS_CDM_VERS"),
         originator=data.get("ORIGINATOR"),
         obj1=obj1,
@@ -571,8 +593,9 @@ def parse_cdm_json(data: dict) -> CDM:
         comments={
             "screening_option": data.get("COMMENT_SCREENING_OPTION"),
             "effective_hbr": data.get("COMMENT_EFFECTIVE_HBR"),
+            "source_collision_probability": data.get("COLLISION_PROBABILITY"),
         },
-        tca=data.get("TCA"),
+        tca=_parse_datetime_utc(data.get("TCA")),
         miss_distance_m=miss_distance,
     )
     

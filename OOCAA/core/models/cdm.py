@@ -53,6 +53,15 @@ class CDM(models.Model):
         max_digits=100, decimal_places=100, null=True, blank=True
     )
     collision_probability_method = models.CharField(max_length=64, null=True, blank=True)
+    collision_probability_multistep = models.DecimalField(
+        max_digits=100, decimal_places=100, null=True, blank=True
+    )
+    collision_probability_alfano = models.DecimalField(
+        max_digits=100, decimal_places=100, null=True, blank=True
+    )
+    collision_probability_monte_carlo = models.DecimalField(
+        max_digits=100, decimal_places=100, null=True, blank=True
+    )
 
     # Additional comments or metadata
     comments = models.JSONField(null=True, blank=True)
@@ -175,6 +184,23 @@ class CDM(models.Model):
     def get_obj2_covariance_rsse(self):
         """Get RSSE for Object 2 covariance matrix."""
         return self.calculate_covariance_rsse(self.obj2_covariance_matrix)
+
+    def get_collision_probability_for_model(self, model: str):
+        """Return the stored collision probability for a given model key."""
+        field_map = {
+            'multistep': 'collision_probability_multistep',
+            'alfano': 'collision_probability_alfano',
+            'monte_carlo': 'collision_probability_monte_carlo',
+        }
+        field_name = field_map.get((model or '').lower())
+        if not field_name:
+            return None
+
+        value = getattr(self, field_name)
+        if value is None and field_name == 'collision_probability_multistep':
+            # Backward compatibility for older rows that only used the legacy field.
+            return self.collision_probability
+        return value
 
     def __str__(self):
         return f"CDM {self.cdm_id} @ {self.tca}"

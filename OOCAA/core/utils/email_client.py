@@ -20,7 +20,7 @@ django.setup()
 
 from django.conf import settings
 from core.services.cdm_service import parse_cdm_json
-from core.services.pc_calculation_service import calculate_pc_multistep, update_cdm_with_pc_result
+from core.services.pc_calculation_service import calculate_all_pc_models, update_cdm_with_all_pc_results
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -103,10 +103,10 @@ def process_cdm_attachment(payload_bytes, auto_calculate_pc=True):
 
             if auto_calculate_pc:
                 try:
-                    calc_result = calculate_pc_multistep(cdm, None)
-                    notify_high_pc(cdm, cdm.collision_probability)
-                    if calc_result.get("success"):
-                        update_cdm_with_pc_result(cdm, calc_result, save=True)
+                    calc_result = calculate_all_pc_models(cdm, None)
+                    update_cdm_with_all_pc_results(cdm, calc_result, save=True)
+                    if cdm.collision_probability is not None:
+                        notify_high_pc(cdm, cdm.collision_probability)
                 except Exception as e:
                     logger.warning(f"PC calculation failed for CDM #{cdm.id}: {e}")
                     results["errors"].append(f"CDM {cdm.cdm_id} saved, Pc calc failed: {e}")

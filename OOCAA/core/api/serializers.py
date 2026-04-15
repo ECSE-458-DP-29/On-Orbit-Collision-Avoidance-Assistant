@@ -74,6 +74,9 @@ class CDMSerializer(serializers.ModelSerializer):
             'relative_position_n',
             'collision_probability',
             'collision_probability_method',
+            'collision_probability_multistep',
+            'collision_probability_alfano',
+            'collision_probability_monte_carlo',
             'obj1_data',
             'obj2_data',
             # State vectors (ECI frame)
@@ -201,6 +204,9 @@ class CDMMinimalSerializer(serializers.ModelSerializer):
             'miss_distance_m',
             'collision_probability',
             'collision_probability_method',
+            'collision_probability_multistep',
+            'collision_probability_alfano',
+            'collision_probability_monte_carlo',
         ]
 
 
