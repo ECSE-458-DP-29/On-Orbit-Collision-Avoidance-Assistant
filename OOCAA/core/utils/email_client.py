@@ -105,7 +105,8 @@ def process_cdm_attachment(payload_bytes, auto_calculate_pc=True):
                 try:
                     calc_result = calculate_all_pc_models(cdm, None)
                     update_cdm_with_all_pc_results(cdm, calc_result, save=True)
-                    notify_high_pc(cdm, cdm.collision_probability)
+                    if cdm.collision_probability is not None:
+                        notify_high_pc(cdm, cdm.collision_probability)
                 except Exception as e:
                     logger.warning(f"PC calculation failed for CDM #{cdm.id}: {e}")
                     results["errors"].append(f"CDM {cdm.cdm_id} saved, Pc calc failed: {e}")
