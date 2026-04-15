@@ -385,24 +385,11 @@ def manage_cdms(request):
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
-    # Lazy backfill only the currently selected model.
-    # This avoids expensive/error-prone full-model runs during page rendering.
+    # Do not calculate or persist Pc values during GET request rendering.
+    # Only display already-stored values; missing values remain unavailable.
     for cdm in page_obj.object_list:
         selected_model = filters['pc_model']
         cdm.selected_collision_probability = cdm.get_collision_probability_for_model(selected_model)
-
-        if cdm.selected_collision_probability is None:
-            try:
-                _calculate_selected_pc_model(cdm, selected_model)
-            except Exception as exc:
-                logger.warning(
-                    "Could not backfill selected Pc model '%s' for CDM %s: %s",
-                    selected_model,
-                    cdm.id,
-                    str(exc),
-                )
-            cdm.selected_collision_probability = cdm.get_collision_probability_for_model(selected_model)
-
         selected_method = None
         selected_is_source = False
         method_from_record = (cdm.collision_probability_method or '').strip()
