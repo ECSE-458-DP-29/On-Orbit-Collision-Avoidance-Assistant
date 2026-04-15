@@ -208,9 +208,9 @@
                         <input type="hidden" name="sort_order" value="{{ filters.sort_order|default:'desc' }}">
                         <label for="pc_model" class="form-label mb-0 small text-muted">Pc Model</label>
                         <select name="pc_model" id="pc_model" class="form-select form-select-sm" onchange="this.form.submit()">
-                            <option value="multistep" {% if filters.pc_model == 'multistep' %}selected{% endif %}>MultiStep</option>
-                            <option value="alfano" {% if filters.pc_model == 'alfano' %}selected{% endif %}>Alfano</option>
-                            <option value="monte_carlo" {% if filters.pc_model == 'monte_carlo' %}selected{% endif %}>Monte Carlo</option>
+                            <option value="multistep" {% if filters.pc_model == 'multistep' %}selected{% endif %}>PcMultiStep</option>
+                            <option value="alfano" {% if filters.pc_model == 'alfano' %}selected{% endif %}>PcCircle (Alfano-based)</option>
+                            <option value="monte_carlo" {% if filters.pc_model == 'monte_carlo' %}selected{% endif %}>Pc_SDMC (Monte Carlo)</option>
                         </select>
                     </form>
                     <a href="/upload/cdm/" class="btn btn-sm btn-primary">
@@ -297,7 +297,7 @@
                                     {% endif %}
                                 </th>
                                 <th style="cursor: pointer;">
-                                    Pc ({{ selected_pc_model_label }})
+                                    Pc
                                     {% if filters.sort_field == "collision_probability" %}
                                         {% if filters.sort_order == "asc" %}
                                             <a href="?cdm_id={{ filters.cdm_id|urlencode }}&obj1_id={{ filters.obj1_id|urlencode }}&obj2_id={{ filters.obj2_id|urlencode }}&event_id={{ filters.event_id|urlencode }}&pc_min={{ filters.pc_min|urlencode }}&pc_max={{ filters.pc_max|urlencode }}&simple_search={{ filters.simple_search|urlencode }}&pc_model={{ filters.pc_model|urlencode }}&sort_field=collision_probability&sort_order=desc" style="text-decoration: none; color: inherit;"><i class="bi bi-arrow-up-right" style="cursor: pointer;"></i></a>
@@ -364,9 +364,20 @@
                                 </td>
                                 <td>
                                     {% if cdm.selected_collision_probability != None %}
-                                        <span class="badge {% if cdm.selected_collision_probability > 0.01 %}bg-danger{% elif cdm.selected_collision_probability > 0.001 %}bg-warning text-dark{% else %}badge-slate-light{% endif %}">
-                                            {{ cdm.selected_collision_probability|sci_notation:5 }}
-                                        </span>
+                                        <div class="d-flex flex-column">
+                                            <span class="badge {% if cdm.selected_collision_probability > 0.01 %}bg-danger{% elif cdm.selected_collision_probability > 0.001 %}bg-warning text-dark{% else %}badge-slate-light{% endif %}">
+                                                {{ cdm.selected_collision_probability|sci_notation:5 }}
+                                            </span>
+                                            {% if cdm.selected_pc_method_label %}
+                                                <small class="text-muted mt-1">
+                                                    {% if cdm.selected_pc_is_source %}
+                                                        CDM: {{ cdm.selected_pc_method_label }}
+                                                    {% else %}
+                                                        {{ cdm.selected_pc_method_label }}
+                                                    {% endif %}
+                                                </small>
+                                            {% endif %}
+                                        </div>
                                     {% else %}
                                         <span class="badge badge-slate-light">N/A</span>
                                     {% endif %}

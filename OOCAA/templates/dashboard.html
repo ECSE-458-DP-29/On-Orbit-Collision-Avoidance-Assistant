@@ -97,14 +97,14 @@
             <div class="controls-card d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
                     <strong>Probability Model:</strong>
-                    <span id="selectedModelBadge" class="badge text-bg-secondary ms-2">MultiStep</span>
+                    <span id="selectedModelBadge" class="badge text-bg-secondary ms-2">PcMultiStep</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <label for="pcModelSelect" class="form-label mb-0">Use model</label>
                     <select id="pcModelSelect" class="form-select form-select-sm" style="min-width: 180px;">
-                        <option value="multistep" selected>MultiStep</option>
-                        <option value="alfano">Alfano</option>
-                        <option value="monte_carlo">Monte Carlo</option>
+                        <option value="multistep" selected>PcMultiStep</option>
+                        <option value="alfano">PcCircle (Alfano-based)</option>
+                        <option value="monte_carlo">Pc_SDMC (Monte Carlo)</option>
                     </select>
                 </div>
             </div>

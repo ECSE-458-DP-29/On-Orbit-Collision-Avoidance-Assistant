@@ -22,6 +22,14 @@ from setup_matlab import get_matlab_engine as get_configured_matlab_engine
 
 logger = logging.getLogger(__name__)
 
+CALCULATED_METHOD_NAMES = {
+    'pcmultistep',
+    'pccircle',
+    'pc_sdmc',
+    'pcdilution',
+    'cara',
+}
+
 # MATLAB Engine will be lazily initialized
 _matlab_engine = None
 
@@ -811,6 +819,7 @@ def update_cdm_with_all_pc_results(cdm, all_results: Dict[str, Any], save: bool 
         normalized_values.get('alfano'),
         normalized_values.get('monte_carlo'),
     ]
+    used_source_fallback = False
     if zero_values and all(v == Decimal('0') for v in zero_values):
         fallback = _json_collision_probability_fallback(cdm)
         if fallback is not None:
@@ -820,11 +829,18 @@ def update_cdm_with_all_pc_results(cdm, all_results: Dict[str, Any], save: bool 
             normalized_values['multistep'] = fallback
             normalized_values['alfano'] = fallback
             normalized_values['monte_carlo'] = fallback
+            used_source_fallback = True
 
     # Keep legacy field synchronized with multistep for backward compatibility.
     if normalized_values.get('multistep') is not None:
         cdm.collision_probability = normalized_values['multistep']
-        cdm.collision_probability_method = 'PcMultiStep'
+        if used_source_fallback:
+            existing_method = (cdm.collision_probability_method or '').strip()
+            if existing_method.lower() in CALCULATED_METHOD_NAMES:
+                existing_method = ''
+            cdm.collision_probability_method = existing_method or 'CDM provided'
+        else:
+            cdm.collision_probability_method = 'PcMultiStep'
 
     if save:
         cdm.save()

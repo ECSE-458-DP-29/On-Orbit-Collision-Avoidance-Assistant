@@ -27,6 +27,7 @@ from core.services import (
 from core.services.pc_calculation_service import (
     calculate_pc_multistep,
     calculate_pc_circle,
+    calculate_pc_monte_carlo,
     calculate_pc_dilution,
     calculate_all_pc_models,
     batch_calculate_pc,
@@ -49,10 +50,42 @@ PC_MODEL_FIELD_MAP = {
 }
 
 PC_MODEL_LABELS = {
-    'multistep': 'MultiStep',
-    'alfano': 'Alfano',
-    'monte_carlo': 'Monte Carlo',
+    'multistep': 'PcMultiStep',
+    'alfano': 'PcCircle (Alfano-based)',
+    'monte_carlo': 'Pc_SDMC (Monte Carlo)',
 }
+
+CALCULATED_METHOD_NAMES = {
+    'pcmultistep',
+    'pccircle',
+    'pc_sdmc',
+    'pcdilution',
+    'cara',
+}
+
+
+def _is_source_probability_method(method_name: str) -> bool:
+    """Return True when a probability method looks CDM-source-provided (not calculated)."""
+    normalized = (method_name or '').strip().lower()
+    if not normalized:
+        return False
+    return normalized not in CALCULATED_METHOD_NAMES
+
+
+def _calculate_selected_pc_model(cdm: CDM, selected_model: str) -> None:
+    """Calculate and persist only the selected model for Manage CDMs page backfill."""
+    calculators = {
+        'multistep': calculate_pc_multistep,
+        'alfano': calculate_pc_circle,
+        'monte_carlo': calculate_pc_monte_carlo,
+    }
+    calculator = calculators.get((selected_model or '').lower())
+    if not calculator:
+        return
+
+    result = calculator(cdm)
+    if result.get('success'):
+        update_cdm_with_pc_result(cdm, result, save=True)
 
 
 def api_index(request):
@@ -352,21 +385,52 @@ def manage_cdms(request):
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
 
-    # Lazy backfill: if model columns are empty (legacy rows), calculate and store
-    # all model values so the dropdown has real data to display.
+    # Lazy backfill only the currently selected model.
+    # This avoids expensive/error-prone full-model runs during page rendering.
     for cdm in page_obj.object_list:
-        if (
-            cdm.collision_probability_multistep is None
-            or cdm.collision_probability_alfano is None
-            or cdm.collision_probability_monte_carlo is None
-        ):
-            try:
-                all_results = calculate_all_pc_models(cdm, None)
-                update_cdm_with_all_pc_results(cdm, all_results, save=True)
-            except Exception as exc:
-                logger.warning("Could not backfill Pc models for CDM %s: %s", cdm.id, str(exc))
+        selected_model = filters['pc_model']
+        cdm.selected_collision_probability = cdm.get_collision_probability_for_model(selected_model)
 
-        cdm.selected_collision_probability = cdm.get_collision_probability_for_model(filters['pc_model'])
+        if cdm.selected_collision_probability is None:
+            try:
+                _calculate_selected_pc_model(cdm, selected_model)
+            except Exception as exc:
+                logger.warning(
+                    "Could not backfill selected Pc model '%s' for CDM %s: %s",
+                    selected_model,
+                    cdm.id,
+                    str(exc),
+                )
+            cdm.selected_collision_probability = cdm.get_collision_probability_for_model(selected_model)
+
+        selected_method = None
+        selected_is_source = False
+        method_from_record = (cdm.collision_probability_method or '').strip()
+
+        if cdm.selected_collision_probability is not None:
+            if _is_source_probability_method(method_from_record):
+                selected_method = method_from_record
+                selected_is_source = True
+            elif selected_model == 'multistep':
+                selected_method = 'PcMultiStep'
+            elif selected_model == 'alfano':
+                selected_method = 'PcCircle (Alfano-based)'
+            elif selected_model == 'monte_carlo':
+                selected_method = 'Pc_SDMC (Monte Carlo)'
+
+            # Legacy rows may only have collision_probability populated from CDM,
+            # without a parsed method string.
+            if (
+                selected_model == 'multistep'
+                and cdm.collision_probability_multistep is None
+                and cdm.collision_probability is not None
+                and not selected_method
+            ):
+                selected_method = 'CDM provided'
+                selected_is_source = True
+
+        cdm.selected_pc_method_label = selected_method
+        cdm.selected_pc_is_source = selected_is_source
     
     context = {
         'cdms': page_obj.object_list,
