@@ -1,1 +1,12 @@
 .DS_Store
+
+# Local MATLAB runtime/engine artifacts (generated locally, very large)
+.matlab_engine_src/
+.matlab_install_root/
+
+# Local Python artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+htmlcov/
+.coverage

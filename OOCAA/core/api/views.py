@@ -3,10 +3,12 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, F
+from django.db.models.functions import Coalesce
 from django.contrib import messages
 from django.views.generic import View
 import json
+import logging
 
 from rest_framework import status, generics
 from rest_framework.response import Response
@@ -26,14 +28,31 @@ from core.services.pc_calculation_service import (
     calculate_pc_multistep,
     calculate_pc_circle,
     calculate_pc_dilution,
+    calculate_all_pc_models,
     batch_calculate_pc,
     update_cdm_with_pc_result,
+    update_cdm_with_all_pc_results,
     PcCalculationError,
     MatlabEngineError,
 )
 from core.models.spaceobject import SpaceObject
 from core.models.cdm import CDM
 from core.services.cdm_service import parse_cdm_json
+
+logger = logging.getLogger(__name__)
+
+
+PC_MODEL_FIELD_MAP = {
+    'multistep': 'collision_probability_multistep',
+    'alfano': 'collision_probability_alfano',
+    'monte_carlo': 'collision_probability_monte_carlo',
+}
+
+PC_MODEL_LABELS = {
+    'multistep': 'MultiStep',
+    'alfano': 'Alfano',
+    'monte_carlo': 'Monte Carlo',
+}
 
 
 def api_index(request):
@@ -237,14 +256,28 @@ def manage_cdms(request):
         'event_id': request.GET.get('event_id', ''),
         'pc_min': request.GET.get('pc_min', ''),
         'pc_max': request.GET.get('pc_max', ''),
+        'pc_model': request.GET.get('pc_model', 'multistep'),
         'sort_field': request.GET.get('sort_field', 'creation_date'),
         'sort_order': request.GET.get('sort_order', 'desc'),
     }
+
+    if filters['pc_model'] not in PC_MODEL_FIELD_MAP:
+        filters['pc_model'] = 'multistep'
+
+    selected_pc_field = PC_MODEL_FIELD_MAP[filters['pc_model']]
+    if filters['pc_model'] == 'multistep':
+        cdms = cdms.annotate(
+            selected_collision_probability=Coalesce(
+                F('collision_probability_multistep'),
+                F('collision_probability')
+            )
+        )
+    else:
+        cdms = cdms.annotate(selected_collision_probability=F(selected_pc_field))
     
     # Apply simple search first (searches CDM ID, Object Designators, and Object Names)
     if filters['simple_search']:
         search_term = filters['simple_search']
-        from django.db.models import Q
         cdms = cdms.filter(
             Q(cdm_id__icontains=search_term) | 
             Q(obj1__object_designator__icontains=search_term) | 
@@ -273,14 +306,14 @@ def manage_cdms(request):
     if filters['pc_min']:
         try:
             pc_min = float(filters['pc_min'])
-            cdms = cdms.filter(collision_probability__gte=pc_min)
+            cdms = cdms.filter(selected_collision_probability__gte=pc_min)
         except ValueError:
             pass
     
     if filters['pc_max']:
         try:
             pc_max = float(filters['pc_max'])
-            cdms = cdms.filter(collision_probability__lte=pc_max)
+            cdms = cdms.filter(selected_collision_probability__lte=pc_max)
         except ValueError:
             pass
     
@@ -303,10 +336,14 @@ def manage_cdms(request):
         sort_order = 'desc'
     
     # Build the order_by parameter
+    order_by_base = sort_field
+    if sort_field == 'collision_probability':
+        order_by_base = 'selected_collision_probability'
+
     if sort_order == 'asc':
-        order_by_field = sort_field
+        order_by_field = order_by_base
     else:
-        order_by_field = f'-{sort_field}'
+        order_by_field = f'-{order_by_base}'
     
     cdms = cdms.order_by(order_by_field)
     
@@ -314,13 +351,34 @@ def manage_cdms(request):
     paginator = Paginator(cdms, 25)  # 25 CDMs per page
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
+
+    # Lazy backfill: if model columns are empty (legacy rows), calculate and store
+    # all model values so the dropdown has real data to display.
+    for cdm in page_obj.object_list:
+        if (
+            cdm.collision_probability_multistep is None
+            or cdm.collision_probability_alfano is None
+            or cdm.collision_probability_monte_carlo is None
+        ):
+            try:
+                all_results = calculate_all_pc_models(cdm, None)
+                update_cdm_with_all_pc_results(cdm, all_results, save=True)
+            except Exception as exc:
+                logger.warning("Could not backfill Pc models for CDM %s: %s", cdm.id, str(exc))
+
+        cdm.selected_collision_probability = cdm.get_collision_probability_for_model(filters['pc_model'])
     
     context = {
         'cdms': page_obj.object_list,
         'page_obj': page_obj,
         'is_paginated': page_obj.has_other_pages(),
         'filters': filters,
+        'selected_pc_model_label': PC_MODEL_LABELS[filters['pc_model']],
     }
+
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+    context['base_query_params'] = query_params.urlencode()
     
     return render(request, 'manage_cdms.html', context)
 
@@ -372,9 +430,8 @@ def upload_cdm(request):
                         # Optionally calculate Pc
                         if auto_calculate_pc:
                             try:
-                                result = calculate_pc_multistep(cdm, None)
-                                if result.get('success'):
-                                    update_cdm_with_pc_result(cdm, result, save=True)
+                                result = calculate_all_pc_models(cdm, None)
+                                update_cdm_with_all_pc_results(cdm, result, save=True)
                             except Exception as e:
                                 # Don't fail the CDM upload if Pc calculation fails
                                 messages.warning(request, f'CDM {cdm.cdm_id} uploaded but Pc calculation failed: {str(e)}')
@@ -631,9 +688,9 @@ class CalculatePcView(APIView):
         matlab_params = request.data.get('params', None)
         
         # Validate method
-        if method not in ['multistep', 'circle', 'dilution']:
+        if method not in ['multistep', 'circle', 'dilution', 'all']:
             return Response(
-                {"detail": f"Invalid method: {method}. Must be 'multistep', 'circle', or 'dilution'."},
+                {"detail": f"Invalid method: {method}. Must be 'multistep', 'circle', 'dilution', or 'all'."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -645,10 +702,15 @@ class CalculatePcView(APIView):
                 result = calculate_pc_circle(cdm)
             elif method == 'dilution':
                 result = calculate_pc_dilution(cdm, matlab_params)
+            else:
+                result = calculate_all_pc_models(cdm, matlab_params)
             
             # Update CDM if requested
             if update_cdm_flag and result.get('success'):
-                update_cdm_with_pc_result(cdm, result, save=True)
+                if method == 'all':
+                    update_cdm_with_all_pc_results(cdm, result, save=True)
+                else:
+                    update_cdm_with_pc_result(cdm, result, save=True)
                 result['updated'] = True
             else:
                 result['updated'] = False
@@ -819,9 +881,25 @@ class DashboardDataView(APIView):
         from django.db.models import Count, Min, Max, Avg, Q
         from datetime import datetime, timedelta
         
-        # Get all CDMs and events
-        cdms = CDM.objects.filter(collision_probability__isnull=False).select_related('obj1', 'obj2', 'event')
-        events = CDM.objects.filter(event__isnull=False).values('event').distinct()
+        selected_model = request.query_params.get('pc_model', 'multistep')
+        if selected_model not in PC_MODEL_FIELD_MAP:
+            selected_model = 'multistep'
+
+        selected_pc_field = PC_MODEL_FIELD_MAP[selected_model]
+        cdm_queryset = CDM.objects.all()
+        if selected_model == 'multistep':
+            cdm_queryset = cdm_queryset.annotate(
+                selected_collision_probability=Coalesce(
+                    F('collision_probability_multistep'),
+                    F('collision_probability')
+                )
+            )
+        else:
+            cdm_queryset = cdm_queryset.annotate(selected_collision_probability=F(selected_pc_field))
+
+        # Use the selected model probability consistently across all dashboard metrics.
+        cdms = cdm_queryset.filter(selected_collision_probability__isnull=False).select_related('obj1', 'obj2', 'event')
+        events = cdms.filter(event__isnull=False).values('event').distinct()
         
         # --- Collision Probability Distribution ---
         # Bin collision probabilities into ranges for histogram
@@ -836,8 +914,8 @@ class DashboardDataView(APIView):
         }
         
         for cdm in cdms:
-            if cdm.collision_probability:
-                pc = float(cdm.collision_probability)
+            if cdm.selected_collision_probability is not None:
+                pc = float(cdm.selected_collision_probability)
                 if pc < 1e-6:
                     pc_bins['0-1e-6'] += 1
                 elif pc < 1e-5:
@@ -856,9 +934,7 @@ class DashboardDataView(APIView):
         # --- Conjunction Events Over Time ---
         # Group CDMs by TCA date and count events
         from django.db.models.functions import TruncDate
-        events_over_time = CDM.objects.filter(
-            event__isnull=False
-        ).annotate(
+        events_over_time = cdms.filter(event__isnull=False).annotate(
             tca_date=TruncDate('tca')
         ).values('tca_date').annotate(
             count=Count('event', distinct=True)
@@ -889,7 +965,7 @@ class DashboardDataView(APIView):
                 
                 pc_evolution_data[pair_key]['data_points'].append({
                     'tca': cdm.tca.isoformat() if cdm.tca else None,
-                    'pc': float(cdm.collision_probability),
+                    'pc': float(cdm.selected_collision_probability),
                     'creation_date': cdm.creation_date.isoformat() if cdm.creation_date else None,
                 })
         
@@ -902,27 +978,27 @@ class DashboardDataView(APIView):
         
         # --- Risk Distribution (High/Medium/Low) ---
         risk_distribution = {
-            'High Risk (≥1e-3)': cdms.filter(collision_probability__gte=1e-3).count(),
+            'High Risk (≥1e-3)': cdms.filter(selected_collision_probability__gte=1e-3).count(),
             'Medium Risk (1e-5 to 1e-3)': cdms.filter(
-                collision_probability__gte=1e-5,
-                collision_probability__lt=1e-3
+                selected_collision_probability__gte=1e-5,
+                selected_collision_probability__lt=1e-3
             ).count(),
-            'Low Risk (<1e-5)': cdms.filter(collision_probability__lt=1e-5).count(),
+            'Low Risk (<1e-5)': cdms.filter(selected_collision_probability__lt=1e-5).count(),
         }
         
         # --- Event Statistics ---
         pc_stats = cdms.aggregate(
-            avg_pc=Avg('collision_probability'),
-            min_pc=Min('collision_probability'),
-            max_pc=Max('collision_probability'),
+            avg_pc=Avg('selected_collision_probability'),
+            min_pc=Min('selected_collision_probability'),
+            max_pc=Max('selected_collision_probability'),
         )
         
-        high_risk_count = cdms.filter(collision_probability__gte=1e-3).count()
+        high_risk_count = cdms.filter(selected_collision_probability__gte=1e-3).count()
         medium_risk_count = cdms.filter(
-            collision_probability__gte=1e-5,
-            collision_probability__lt=1e-3
+            selected_collision_probability__gte=1e-5,
+            selected_collision_probability__lt=1e-3
         ).count()
-        low_risk_count = cdms.filter(collision_probability__lt=1e-5).count()
+        low_risk_count = cdms.filter(selected_collision_probability__lt=1e-5).count()
         
         # Return data for frontend
         return Response({
@@ -939,6 +1015,8 @@ class DashboardDataView(APIView):
                 'high_risk_count': high_risk_count,
                 'medium_risk_count': medium_risk_count,
                 'low_risk_count': low_risk_count,
+                'selected_probability_model': selected_model,
+                'selected_probability_model_label': PC_MODEL_LABELS[selected_model],
             }
         }, status=status.HTTP_200_OK)
 

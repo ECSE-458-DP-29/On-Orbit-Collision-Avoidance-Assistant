@@ -1,7 +1,13 @@
 import json
 import pytest
+from decimal import Decimal
 from django.test import TestCase
 from core.services.cdm_service import parse_cdm_json
+from core.services.pc_calculation_service import (
+    calculate_all_pc_models,
+    update_cdm_with_pc_result,
+    update_cdm_with_all_pc_results,
+)
 from core.models import CDM, SpaceObject
 from core.tests.factories import CDMFactory, SpaceObjectFactory, EventFactory
 
@@ -110,3 +116,164 @@ class TestCDMFactoryAndRelationships:
         assert cdm.event == event
         assert event.obj1 == obj1
         assert event.obj2 == obj2
+
+
+@pytest.mark.django_db
+class TestPcResultPersistence:
+    def test_update_cdm_with_individual_model_results(self):
+        cdm = CDMFactory(
+            collision_probability=None,
+            collision_probability_multistep=None,
+            collision_probability_alfano=None,
+            collision_probability_monte_carlo=None,
+        )
+
+        update_cdm_with_pc_result(cdm, {'success': True, 'Pc': 1e-4, 'method': 'PcMultiStep'}, save=False)
+        update_cdm_with_pc_result(cdm, {'success': True, 'Pc': 2e-4, 'method': 'PcCircle'}, save=False)
+        update_cdm_with_pc_result(cdm, {'success': True, 'Pc': 3e-4, 'method': 'MonteCarlo'}, save=False)
+
+        assert cdm.collision_probability_multistep == Decimal('0.0001')
+        assert cdm.collision_probability_alfano == Decimal('0.0002')
+        assert cdm.collision_probability_monte_carlo == Decimal('0.0003')
+        assert cdm.collision_probability == Decimal('0.0001')
+
+    def test_update_cdm_with_all_model_results(self):
+        cdm = CDMFactory(
+            collision_probability=None,
+            collision_probability_multistep=None,
+            collision_probability_alfano=None,
+            collision_probability_monte_carlo=None,
+        )
+
+        update_cdm_with_all_pc_results(
+            cdm,
+            {
+                'success': True,
+                'multistep': 4e-5,
+                'alfano': 5e-5,
+                'monte_carlo': 6e-5,
+            },
+            save=False,
+        )
+
+        assert cdm.collision_probability == Decimal('0.00004')
+        assert cdm.collision_probability_multistep == Decimal('0.00004')
+        assert cdm.collision_probability_alfano == Decimal('0.00005')
+        assert cdm.collision_probability_monte_carlo == Decimal('0.00006')
+
+    def test_model_probability_accessor_uses_legacy_fallback_for_multistep(self):
+        cdm = CDMFactory(
+            collision_probability=Decimal('0.00007'),
+            collision_probability_multistep=None,
+            collision_probability_alfano=Decimal('0.00008'),
+            collision_probability_monte_carlo=Decimal('0.00009'),
+        )
+
+        assert cdm.get_collision_probability_for_model('multistep') == Decimal('0.00007')
+        assert cdm.get_collision_probability_for_model('alfano') == Decimal('0.00008')
+        assert cdm.get_collision_probability_for_model('monte_carlo') == Decimal('0.00009')
+
+    def test_calculate_all_models_has_python_fallbacks_without_matlab(self, monkeypatch):
+        from core.services import pc_calculation_service as pcs
+
+        def _raise_matlab_error():
+            raise pcs.MatlabEngineError('MATLAB unavailable in test')
+
+        monkeypatch.setattr(pcs, 'get_matlab_engine', _raise_matlab_error)
+
+        cdm = CDMFactory(
+            collision_probability=None,
+            collision_probability_multistep=None,
+            collision_probability_alfano=None,
+            collision_probability_monte_carlo=None,
+            obj1_position_x=7000000.0,
+            obj1_position_y=0.0,
+            obj1_position_z=0.0,
+            obj1_velocity_x=0.0,
+            obj1_velocity_y=7500.0,
+            obj1_velocity_z=0.0,
+            obj2_position_x=7000010.0,
+            obj2_position_y=2.0,
+            obj2_position_z=0.5,
+            obj2_velocity_x=0.0,
+            obj2_velocity_y=7500.1,
+            obj2_velocity_z=0.0,
+            obj1_covariance_matrix=[
+                [100.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 100.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 100.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            ],
+            obj2_covariance_matrix=[
+                [100.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 100.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 100.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            ],
+            hard_body_radius=10.0,
+        )
+
+        result = calculate_all_pc_models(cdm, None)
+
+        assert result['multistep'] is not None
+        assert result['alfano'] is not None
+        assert result['monte_carlo'] is not None
+        assert 0.0 <= result['multistep'] <= 1.0
+        assert 0.0 <= result['alfano'] <= 1.0
+        assert 0.0 <= result['monte_carlo'] <= 1.0
+
+    def test_update_all_pc_results_clamps_values_to_db_safe_range(self):
+        cdm = CDMFactory(
+            collision_probability=None,
+            collision_probability_multistep=None,
+            collision_probability_alfano=None,
+            collision_probability_monte_carlo=None,
+            comments={},
+        )
+
+        update_cdm_with_all_pc_results(
+            cdm,
+            {
+                'success': True,
+                'multistep': 1.2,
+                'alfano': 2.0,
+                'monte_carlo': 10.0,
+            },
+            save=False,
+        )
+
+        max_allowed = Decimal('0.' + ('9' * 100))
+        assert cdm.collision_probability == max_allowed
+        assert cdm.collision_probability_multistep == max_allowed
+        assert cdm.collision_probability_alfano == max_allowed
+        assert cdm.collision_probability_monte_carlo == max_allowed
+
+    def test_update_all_pc_results_uses_source_json_pc_when_all_zero(self):
+        cdm = CDMFactory(
+            collision_probability=Decimal('0.00000001347'),
+            collision_probability_multistep=None,
+            collision_probability_alfano=None,
+            collision_probability_monte_carlo=None,
+            comments={'source_collision_probability': '1.347e-08'},
+        )
+
+        update_cdm_with_all_pc_results(
+            cdm,
+            {
+                'success': True,
+                'multistep': 0.0,
+                'alfano': 0.0,
+                'monte_carlo': 0.0,
+            },
+            save=False,
+        )
+
+        fallback = Decimal('1.347e-08')
+        assert cdm.collision_probability == fallback
+        assert cdm.collision_probability_multistep == fallback
+        assert cdm.collision_probability_alfano == fallback
+        assert cdm.collision_probability_monte_carlo == fallback
